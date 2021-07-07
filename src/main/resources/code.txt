@@ -1,0 +1,8 @@
+y = true;
+// test
+if y {
+  print y;
+}
+x = 0;
+
+
