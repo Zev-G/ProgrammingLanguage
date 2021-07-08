@@ -50,6 +50,7 @@ public final class Dissectors {
             if (builder.length() > 0) {
                 portions.add(new Portion(null, builder.toString()));
             }
+            System.out.println(portions);
             return portions.toArray(new Portion[0]);
         }
 

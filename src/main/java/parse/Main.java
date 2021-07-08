@@ -45,9 +45,8 @@ public final class Main {
     private static final String[] PORTIONS = { "!", "&&", "&", "||", "|", "==", "+=", "-=", "*=", "/=", "=", "--", "++", "+", "-", "*", "=" };
 
     public static void main(String[] args) {
-        String code = new BufferedReader(new InputStreamReader(Objects.requireNonNull(Main.class.getClassLoader()
-                .getResourceAsStream("code.txt")))).lines().collect(Collectors.joining("\n"));
-//        System.out.println("RUNNING:\n" + code.indent(4));
+        String code = new BufferedReader(new InputStreamReader(Objects.requireNonNull(Main.class.getClassLoader().getResourceAsStream("code.txt")))).lines().collect(Collectors.joining("\n"));
+        System.out.println("RUNNING:\n" + code.indent(4));
 
         SimpleSubStructure root = new SimpleSubStructure(new ParseType("root"), text -> {
             List<Portion> portions = new ArrayList<>();
@@ -68,9 +67,8 @@ public final class Main {
             char[] charArray = text.getText().toCharArray();
             for (int i = 0, charArrayLength = charArray.length; i < charArrayLength; i++) {
                 char c = charArray[i];
-                String upTo = text.getText().substring(0, i);
-                System.out.println(upTo);
-                if (upTo.endsWith("//") && !inString) {
+                String after = text.getText().substring(i);
+                if (after.startsWith("//") && !inString) {
                     inSingleLineComment = true;
                 }
                 if (c != '\n' && c != '\r') {
@@ -79,7 +77,6 @@ public final class Main {
                     inSingleLineComment = false;
                 }
                 if (inSingleLineComment) {
-                    System.out.println("inComment");
                     continue;
                 }
                 if (c == '{') {
@@ -103,12 +100,13 @@ public final class Main {
                     }
                 }
 
-            if (c != '\n' && c != '\r') {
-                onLine = 0;
-                line++;
-                builder.append(c);
+                if (c != '\n' && c != '\r') {
+                    onLine = 0;
+                    line++;
+                    builder.append(c);
+                }
             }
-            }
+            System.out.println(portions);
             return portions.toArray(new Portion[0]);
         });
         root.setParseValidator(portion -> portion != null && (portion.getType().equals("multi-line") || portion.getType().equals("root")));
@@ -129,7 +127,7 @@ public final class Main {
                 literal("=", ASSIGNMENT), literal("--", DECREMENT), literal("++", INCREMENT), literal("+=", PLUS_EQUALS), literal("-=", MINUS_EQUALS), literal("*=", TIMES_EQUALS), literal("/=", DIVIDE_EQUALS),
                 literal("+", PLUS), literal("-", MINUS), literal("*", TIMES), literal("/", DIVIDE),
                 literal("true", BOOLEAN), literal("false", BOOLEAN),
-                fromPredicate(Main::isNum, NUMBER), literal("print", ACTION), matches("[^=+\\-\n ]", VARIABLE)
+                fromPredicate(Main::isNum, NUMBER), literal("print", ACTION), matches("[^=+\\-\n ]+", VARIABLE)
         ));
         root.getChildren().add(lineStructure);
         statementStructure.getChildren().add(lineStructure);

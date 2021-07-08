@@ -1,8 +1,9 @@
 y = true;
-// test
+
 if y {
   print y;
 }
 x = 0;
-
-
+// test
+ff = 0;
+print x
