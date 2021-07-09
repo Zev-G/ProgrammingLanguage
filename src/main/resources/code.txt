@@ -1,9 +1,10 @@
+// test
 y = true;
 
 if y {
   print y;
 }
-x = 0;
-// test
+x = 12300.124;
+
 ff = 0;
-print x
+print x;

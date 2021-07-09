@@ -1,6 +1,6 @@
-package parse;
+package parse.old;
 
-public abstract class ContextAction implements Runnable {
+abstract class ContextAction implements Runnable {
 
     private final int clearDepth;
 

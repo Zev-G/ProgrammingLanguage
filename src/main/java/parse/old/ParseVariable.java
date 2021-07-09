@@ -1,6 +1,6 @@
-package parse;
+package parse.old;
 
-public class ParseVariable {
+class ParseVariable {
 
     private final String name;
 

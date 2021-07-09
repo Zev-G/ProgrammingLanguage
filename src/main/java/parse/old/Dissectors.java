@@ -1,9 +1,9 @@
-package parse;
+package parse.old;
 
 import java.util.*;
 import java.util.function.Function;
 
-public final class Dissectors {
+final class Dissectors {
 
     public static final Function<String, String[]> SEMICOLONS = s -> s.split(";");
 

@@ -1,22 +1,24 @@
 package parse;
 
-import java.util.Arrays;
-import java.util.stream.Collectors;
+public interface ParseType {
 
-public class ParseType {
-
-    private final String val;
-
-    public ParseType(String mark) {
-        this.val = mark;
+    default boolean isParser() {
+        return false;
     }
-    public ParseType(Object... marks) {
-        this.val = Arrays.stream(marks).map(Object::toString).collect(Collectors.joining(" "));
-    }
+    String getName();
 
-    @Override
-    public String toString() {
-        return val;
+    static ParseType byName(String text) {
+        return new ParseType() {
+            @Override
+            public String getName() {
+                return text;
+            }
+
+            @Override
+            public String toString() {
+                return text;
+            }
+        };
     }
 
 }

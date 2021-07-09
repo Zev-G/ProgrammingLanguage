@@ -1,4 +1,4 @@
-package parse;
+package parse.old;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -7,7 +7,7 @@ import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
-public class SimpleSubStructure extends SubStructure {
+class SimpleSubStructure extends SubStructure {
 
     private final ParseType type;
     private final Function<Portion, Portion[]> dissector;

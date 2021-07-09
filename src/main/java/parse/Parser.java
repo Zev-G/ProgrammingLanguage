@@ -2,11 +2,9 @@ package parse;
 
 import java.util.Optional;
 
-public class Parser {
+@FunctionalInterface
+public interface Parser {
 
-    public static Optional<ParsedObject> parse(String text, StructureComponent structure) {
-        return structure.parse(new Portion("root", text));
-    }
-
+    Optional<ParseResult> parse(String text, ParsePosition state);
 
 }

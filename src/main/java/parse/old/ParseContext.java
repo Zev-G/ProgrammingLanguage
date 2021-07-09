@@ -1,9 +1,9 @@
-package parse;
+package parse.old;
 
 
 import java.util.*;
 
-public class ParseContext {
+class ParseContext {
 
     private static final boolean AUTO_ADD_CHILDREN = true;
 

@@ -1,10 +1,10 @@
-package parse;
+package parse.old;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-public abstract class SubStructure implements StructureComponent {
+abstract class SubStructure implements StructureComponent {
 
     protected final List<StructureComponent> children = new ArrayList<>();
 

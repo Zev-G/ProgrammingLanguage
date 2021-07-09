@@ -1,9 +1,9 @@
-package parse;
+package parse.old;
 
 import java.util.Optional;
 import java.util.function.Predicate;
 
-public final class StructureComponents {
+final class StructureComponents {
 
     public static LeafStructureComponent literal(String text, ParseType type) {
         return fromPredicate(s -> s.equals(text), type);

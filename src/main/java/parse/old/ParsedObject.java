@@ -1,11 +1,11 @@
-package parse;
+package parse.old;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
-public class ParsedObject {
+class ParsedObject {
 
     private final List<ParsedObject> children = new ArrayList<>();
     private final String text;
@@ -56,7 +56,7 @@ public class ParsedObject {
 
     @Override
     public String toString() {
-        return "ParsedObject{" +
+        return "ParseResult{" +
                "children=" + children +
                ", type=" + type +
                '}';

@@ -1,6 +1,6 @@
-package parse;
+package parse.old;
 
-public class Portion {
+class Portion {
 
     private final Object type;
     private final String text;

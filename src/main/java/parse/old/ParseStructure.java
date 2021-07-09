@@ -1,8 +1,8 @@
-package parse;
+package parse.old;
 
 import java.util.function.Function;
 
-public class ParseStructure extends SubStructure {
+class ParseStructure extends SubStructure {
 
     public static final Function<Portion, Portion[]> LINE_DISSECTOR = s -> s.getText().lines().map(s1 -> new Portion("line", s1)).toArray(Portion[]::new);
 
