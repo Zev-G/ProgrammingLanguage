@@ -56,6 +56,7 @@ public class LineParser extends ParserBranch {
                 new Literal("return", get("return")),
                 new Literal("true", get("true")), new Literal("false", get("false")),
 
+                new Literal("++", get("increment")), new Literal("--", get("decrement")), new Literal("**", get("square")),
                 new Literal("+", get("plus")), new Literal("-", get("minus")), new Literal("*", get("times")), new Literal("/", get("division")),
 
                 new Literal(">=", get("greater-or-equal")), new Literal(">", get("greater")), new Literal("<=", get("smaller-or-equal")), new Literal("<", get("smaller")),

@@ -179,6 +179,9 @@ public class Runner {
 
     private Object eval(RunContext context, ParseResult result) {
         ParseType type = result.getType();
+        if (result instanceof ParseResultWrapper) {
+            return ((ParseResultWrapper) result).getValue();
+        }
         if (type.equals(get("grouping"))) {
             return evalMultiple(context, result.getChildren());
         }
@@ -209,6 +212,76 @@ public class Runner {
 
         if (results.size() >= 2) {
             ParseType type = results.get(0).getType();
+            if (type.equals(get("variable"))) {
+                ParseResult alteration = results.get(1);
+                if (alteration.typeOf(get("increment"))) {
+                    Variable var = context.getOrCreateVariable(results.get(0).getText(), () -> 0D);
+                    Object val = var.get();
+                    if (val instanceof Number) {
+                        var.set(((Number) val).doubleValue() + 1);
+                        return wrappedEvalMultiple(context, val, results, 2);
+                    }
+                }
+                if (alteration.typeOf(get("decrement"))) {
+                    Variable var = context.getOrCreateVariable(results.get(0).getText(), () -> 0D);
+                    Object val = var.get();
+                    if (val instanceof Number) {
+                        var.set(((Number) val).doubleValue() - 1);
+                        return wrappedEvalMultiple(context, val, results, 2);
+                    }
+                }
+                if (alteration.typeOf(get("square"))) {
+                    Variable var = context.getOrCreateVariable(results.get(0).getText(), () -> 0D);
+                    Object val = var.get();
+                    if (val instanceof Number) {
+                        double doubleVal = ((Number) val).doubleValue();
+                        var.set(doubleVal * doubleVal);
+                        return wrappedEvalMultiple(context, val, results, 2);
+                    } else if (val instanceof String) {
+                        String newVal = ((String) val).repeat(2);
+                        var.set(newVal);
+                        return wrappedEvalMultiple(context, val, results, 2);
+                    }
+                }
+            }
+            if (type.equals(get("increment"))) {
+                if (results.get(1).typeOf(get("variable"))) {
+                    Variable var = context.getOrCreateVariable(results.get(1).getText(), () -> 0);
+                    Object val = var.get();
+                    if (val instanceof Number) {
+                        double newVal = ((Number) val).doubleValue() + 1;
+                        var.set(newVal);
+                        return wrappedEvalMultiple(context, newVal, results, 2);
+                    }
+                }
+            }
+            if (type.equals(get("decrement"))) {
+                if (results.get(1).typeOf(get("variable"))) {
+                    Variable var = context.getOrCreateVariable(results.get(1).getText(), () -> 0);
+                    Object val = var.get();
+                    if (val instanceof Number) {
+                        double newVal = ((Number) val).doubleValue() - 1;
+                        var.set(newVal);
+                        return wrappedEvalMultiple(context, newVal, results, 2);
+                    }
+                }
+            }
+            if (type.equals(get("square"))) {
+                if (results.get(1).typeOf(get("variable"))) {
+                    Variable var = context.getOrCreateVariable(results.get(1).getText(), () -> 0);
+                    Object val = var.get();
+                    if (val instanceof Number) {
+                        double newVal = ((Number) val).doubleValue();
+                        newVal = newVal * newVal;
+                        var.set(newVal);
+                        return wrappedEvalMultiple(context, newVal, results, 2);
+                    } else if (val instanceof String) {
+                        String newVal = ((String) val).repeat(2);
+                        var.set(newVal);
+                        return wrappedEvalMultiple(context, newVal, results, 2);
+                    }
+                }
+            }
             if (type.equals(get("method-name"))) {
                 if (results.get(1).typeOf(get("method-arguments"))) {
                     Optional<Function> function = context.getFunction(results.get(0).getText());
@@ -357,11 +430,39 @@ public class Runner {
         throw new RuntimeException("Couldn't run: " + results + "");
     }
 
+    private Object wrappedEvalMultiple(RunContext context, Object val, List<ParseResult> results, int from) {
+        if (from >= results.size()) {
+            return val;
+        } else {
+            ParseResultWrapper wrapper = new ParseResultWrapper("N/A", val);
+            List<ParseResult> subList = new ArrayList<>(results.subList(from, results.size()));
+            subList.add(0, wrapper);
+            return evalMultiple(context, subList);
+        }
+    }
+
     private static class ReturnedObject {
 
         private final Object value;
 
         public ReturnedObject(Object value) {
+            this.value = value;
+        }
+
+        public Object getValue() {
+            return value;
+        }
+
+    }
+
+    private static class ParseResultWrapper extends ParseResult {
+
+        private static final ParseType TYPE = get("object-wrapper");
+
+        private final Object value;
+
+        public ParseResultWrapper(String text, Object value) {
+            super(TYPE, text);
             this.value = value;
         }
 

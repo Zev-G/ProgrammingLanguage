@@ -5,6 +5,7 @@ import parse.ParseResult;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 public class RunContext {
 
@@ -33,9 +34,15 @@ public class RunContext {
         return Optional.of(var);
     }
     public Variable getOrCreateVariable(String text) {
+        return getOrCreateVariable(text, () -> null);
+    }
+    public Variable getOrCreateVariable(String text, Object initialValue) {
+        return getOrCreateVariable(text, () -> initialValue);
+    }
+    public Variable getOrCreateVariable(String text, Supplier<Object> initialValSupplier) {
         Optional<Variable> varCheck = getVariable(text);
         if (varCheck.isPresent()) return varCheck.get();
-        Variable variable = Variable.empty();
+        Variable variable = Variable.of(initialValSupplier.get());
         variables.put(text, variable);
         return variable;
     }
