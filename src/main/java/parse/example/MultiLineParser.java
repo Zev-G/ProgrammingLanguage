@@ -5,7 +5,7 @@ import parse.*;
 import java.util.ArrayList;
 import java.util.List;
 
-class MultiLineParser extends RedirectParserBranch {
+public class MultiLineParser extends RedirectParserBranch {
 
     private final Parser lineParser;
     private final Parser headerParser;
@@ -66,6 +66,7 @@ class MultiLineParser extends RedirectParserBranch {
             boolean inMultiLineComment = false;
             boolean inString = false;
             boolean inChar = false;
+            boolean escaped = false;
 
             String text;
             StringBuilder segmentBuilder = new StringBuilder();
@@ -119,36 +120,66 @@ class MultiLineParser extends RedirectParserBranch {
                     //      B) Easier to read.
                     boolean checkedChar = false;
 
-                    // Handle open brackets.
-                    if (currentChar == '{') {
-                        within++;
-                        checkedChar = true;
+                    // Handle strings.
+                    if (currentChar == '"') {
+                        if (!inString) {
+                            inString = true;
+                        } else if (!escaped) {
+                            inString = false;
+                        }
                     }
 
-                    // Handle closing brackets.
-                    if (!checkedChar && currentChar == '}') {
-                        checkedChar = true;
-                        within--;
-                        // Add current portion if the parser is returning to its original depth.
+                    // Handle chars.
+                    if (currentChar == '\'') {
+                        if (!inChar) {
+                            inChar = true;
+                        } else if (!escaped) {
+                            inChar = false;
+                        }
+                    }
+
+                    boolean inText = inString || inChar;
+
+                    // Handle character escaping.
+                    if ((inString || inChar) && currentChar == '\\') {
+                        escaped = !escaped;
+                    } else {
+                        escaped = false;
+                    }
+
+                    if (!inText) {
+
+                        // Handle open brackets.
+                        if (currentChar == '{') {
+                            within++;
+                            checkedChar = true;
+                        }
+
+                        // Handle closing brackets.
+                        if (!checkedChar && currentChar == '}') {
+                            checkedChar = true;
+                            within--;
+                            // Add current portion if the parser is returning to its original depth.
+                            if (within == 0) {
+                                segmentBuilder.append(currentChar);
+                                addPortion(statementParser);
+                                continue;
+                            }
+
+                            // Handle errors.
+                            if (within < 0) {
+                                logError("Closing bracket has no opening bracket.");
+                            }
+                        }
+
+                        // If at original depth.
                         if (within == 0) {
-                            segmentBuilder.append(currentChar);
-                            addPortion(statementParser);
-                            continue;
-                        }
-
-                        // Handle errors.
-                        if (within < 0) {
-                            logError("Closing bracket has no opening bracket.");
-                        }
-                    }
-
-                    // If at original depth.
-                    if (within == 0) {
-                        // Check if loop is on line separating character.
-                        if (!checkedChar && currentChar == lineSeparatingChar) {
-                            // Add current line.
-                            addPortion(lineParser);
-                            continue;
+                            // Check if loop is on line separating character.
+                            if (!checkedChar && currentChar == lineSeparatingChar) {
+                                // Add current line.
+                                addPortion(lineParser);
+                                continue;
+                            }
                         }
                     }
 

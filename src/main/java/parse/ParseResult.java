@@ -24,6 +24,9 @@ public class ParseResult {
     public ParseType getType() {
         return type;
     }
+    public boolean typeOf(ParseType type) {
+        return this.type.equals(type);
+    }
 
     public String getText() {
         return text;
@@ -53,6 +56,14 @@ public class ParseResult {
             print.append(" [").append(text).append("]");
         }
         return print.toString();
+    }
+
+    @Override
+    public String toString() {
+        return "ParseResult{" +
+                "type=" + type +
+                ", " + (children.isEmpty() ? "text=" + text : "children=" + children) +
+                '}';
     }
 
 }

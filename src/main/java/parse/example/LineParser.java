@@ -9,9 +9,11 @@ import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static parse.example.TypeRegistry.get;
+
 public class LineParser extends ParserBranch {
 
-    public static final ParseType TYPE = TypeRegistry.get("line");
+    public static final ParseType TYPE = get("line");
 
     private final MultiLineParser multiLineParser;
 
@@ -22,7 +24,9 @@ public class LineParser extends ParserBranch {
         this.multiLineParser = multiLineParser;
 
         this.portions.addAll(Arrays.asList(
-                new Portion(TypeRegistry.get("number")) {
+                new Literal(",", get("separator")),
+
+                new Portion(get("number")) {
                     @Override
                     public int find(String text) {
                         StringBuilder valid = new StringBuilder();
@@ -49,23 +53,127 @@ public class LineParser extends ParserBranch {
                     }
                 },
 
-                new Literal("print", TypeRegistry.get("print")),
+                new Literal("return", get("return")),
+                new Literal("true", get("true")), new Literal("false", get("false")),
 
-                new Literal("==", TypeRegistry.get("equals")), new Literal("!=", TypeRegistry.get("not-equal")), new Literal("=", TypeRegistry.get("assignment")),
+                new Literal("+", get("plus")), new Literal("-", get("minus")), new Literal("*", get("times")), new Literal("/", get("division")),
 
-                new Regex("[^ \n\r=!]+", TypeRegistry.get("variable"))
+                new Literal(">=", get("greater-or-equal")), new Literal(">", get("greater")), new Literal("<=", get("smaller-or-equal")), new Literal("<", get("smaller")),
+                new Literal("||", get("or")), new Literal("|", get("or")), new Literal("&&", get("and")), new Literal("&", get("and")),
+                new Literal("==", get("equals")), new Literal("!=", get("not-equal")), new Literal("=", get("assignment")),
+                new Literal("!", get("negate")),
+
+                new Regex("[^ \n\r=!(),*-+/.]+", get("variable"))
         ));
     }
 
     @Override
     public Optional<ParseResult> parse(String text, ParsePosition state) {
         List<ParseResult> results = new ArrayList<>();
+        int withinParens = 0;
+        StringBuilder buffer = new StringBuilder();
+        boolean inString = false;
+        boolean inChar = false;
+        boolean escaped = false;
 
         char[] characters = text.toCharArray();
         main: for (int at = 0, length = characters.length; at < length; at++) {
             char currentChar = characters[at];
             ParsePosition position = new ParsePosition(text, at);
             String substring = text.substring(at);
+
+            // Handle strings.
+            if (currentChar == '"') {
+                if (!inString) {
+                    inString = true;
+                    if (withinParens == 0) {
+                        buffer = new StringBuilder();
+                        continue;
+                    }
+                } else if (!escaped) {
+                    inString = false;
+                    if (withinParens == 0) {
+                        results.add(new ParseResult(get("string"), buffer.toString()));
+                        buffer = new StringBuilder();
+                        continue;
+                    }
+                }
+            }
+
+            // Handle chars.
+            if (currentChar == '\'') {
+                if (!inChar) {
+                    inChar = true;
+                    if (withinParens == 0) {
+                        buffer = new StringBuilder();
+                        continue;
+                    }
+                } else if (!escaped) {
+                    inChar = false;
+                    if (withinParens == 0) {
+                        results.add(new ParseResult(get("char"), buffer.toString()));
+                        continue;
+                    }
+                }
+            }
+
+            boolean inText = inString || inChar;
+
+            if (inText) {
+                // Handle character escaping.
+                if (currentChar == '\\' && !escaped) {
+                    escaped = true;
+                    if (withinParens != 0) {
+                        buffer.append(currentChar);
+                    }
+                    continue;
+                }
+
+                if (withinParens == 0) {
+
+                    // Handle certain special cases.
+                    if (escaped) {
+                        if (currentChar == 'n') {
+                            currentChar = '\n';
+                        } else if (currentChar == 'r') {
+                            currentChar = '\r';
+                        } else if (currentChar == 't') {
+                            currentChar = '\t';
+                        } else if (currentChar == 'b') {
+                            currentChar = '\b';
+                        } else if (currentChar == 'f') {
+                            currentChar = '\f';
+                        }
+                    }
+                }
+
+                escaped = false;
+                buffer.append(currentChar);
+                continue;
+            }
+
+            if (currentChar == '(') {
+                if (withinParens++ == 0) {
+                    continue;
+                }
+            } else if (currentChar == ')') {
+                withinParens--;
+                if (withinParens == 0) {
+                    Optional<ParseResult> result = parse(buffer.toString(), position);
+                    if (result.isPresent()) {
+                        results.add(new ParseResult(get("grouping"), buffer.toString(), result.get().getChildren()));
+                    } else {
+                        results.add(new ParseResult(get("grouping"), buffer.toString()));
+                    }
+                    buffer = new StringBuilder();
+                    continue;
+                }
+            }
+
+            if (withinParens > 0) {
+                buffer.append(currentChar);
+                continue;
+            }
 
             for (Portion portion : portions) {
                 int found = portion.find(substring);
@@ -77,11 +185,32 @@ public class LineParser extends ParserBranch {
             }
         }
 
+        System.out.println(results);
+
+        if (inString || inChar) {
+            throw new RuntimeException("Text wasn't closed at pos: " + state);
+        }
+
+        // Map all variables in front of groupings to method-names.
+
         if (results.isEmpty()) {
             return Optional.empty();
         } else {
+            for (int i = 0, length = results.size() - 1; i < length; i++) {
+                ParseResult at = results.get(i);
+                ParseResult after = results.get(i + 1);
+                if (at.typeOf(get("variable")) && after.typeOf(get("grouping"))) {
+                    results.set(i, new ParseResult(get("method-name"), at.getText(), at.getChildren()));
+                    results.set(i + 1, new ParseResult(get("method-arguments"), after.getText(), after.getChildren()));
+                    i++;
+                }
+            }
             return Optional.of(new ParseResult(TYPE, text, results));
         }
+    }
+
+    public List<Portion> getPortions() {
+        return portions;
     }
 
     public abstract static class Portion {

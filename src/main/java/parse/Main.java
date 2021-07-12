@@ -11,8 +11,8 @@ import java.util.stream.Collectors;
 public class Main {
 
     public static void main(String[] args) {
-        String code = new BufferedReader(new InputStreamReader(Objects.requireNonNull(Main.class.getClassLoader().getResourceAsStream("code.txt")))).lines().collect(Collectors.joining("\n"));
-        System.out.println(SimpleLang.run(code));
+        String code = new BufferedReader(new InputStreamReader(Objects.requireNonNull(Main.class.getClassLoader().getResourceAsStream("code.go")))).lines().collect(Collectors.joining("\n"));
+        SimpleLang.run(code);
     }
 
 }
