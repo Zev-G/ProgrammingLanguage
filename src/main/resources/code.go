@@ -1,2 +1,9 @@
 x = 0;
-print(x++ + 1);
+while (x < 50) {
+    x++;
+    if (x % 2 == 0) {
+        print("==" * x);
+    } else {
+        print("||" * x);
+    }
+}

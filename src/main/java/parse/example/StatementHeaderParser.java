@@ -84,6 +84,7 @@ public class StatementHeaderParser extends ParserBranch {
         this.lineParser.getPortions().add(0, new LineParser.Literal("else if", TypeRegistry.get("elif")));
         this.lineParser.getPortions().add(0, new LineParser.Literal("elif", TypeRegistry.get("elif")));
         this.lineParser.getPortions().add(0, new LineParser.Literal("for", TypeRegistry.get("for")));
+        this.lineParser.getPortions().add(0, new LineParser.Literal("while", TypeRegistry.get("while")));
     }
 
     @Override

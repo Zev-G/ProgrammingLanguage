@@ -12,6 +12,16 @@ import java.util.stream.Collectors;
 
 import static parse.example.TypeRegistry.get;
 
+/**
+ * <h1>To be implemented:</h1>
+ * <ul>
+ *     <li>(DONE) Modulo</li>
+ *     <li>(DONE) While Loops</li>
+ *     <li>Times equal (*=), divide equals (/=), etc.</li>
+ *     <li>Fields and methods of objects.</li>
+ *     <li>Accessing java classes.</li>
+ * </ul>
+ */
 public class Runner {
 
     private final RunContext global = new RunContext();
@@ -172,6 +182,17 @@ public class Runner {
                     throw new RuntimeException("Invalid inputs in for statement: " + header);
                 }
             }
+            if (defining.typeOf(get("while"))) {
+                List<ParseResult> check = headerLine.getChildren().subList(1, headerLine.getChildren().size());
+                Object last = null;
+                while ((Boolean) evalMultiple(newContext, check)) {
+                    last = run(context, body);
+                    if (last instanceof ReturnedObject) {
+                        break;
+                    }
+                }
+                return last;
+            }
 
         }
         throw new RuntimeException("Couldn't run statement: " + header + " " + body);
@@ -204,7 +225,7 @@ public class Runner {
     }
 
     private static final List<ParseType> STRING_TYPES = Arrays.asList(get("plus"), get("times"));
-    private static final List<ParseType> MATH_TYPES = Arrays.asList(get("plus"), get("minus"), get("times"), get("division"), get("greater-or-equal"), get("greater"), get("smaller-or-equal"), get("smaller"));
+    private static final List<ParseType> MATH_TYPES = Arrays.asList(get("plus"), get("minus"), get("times"), get("division"), get("greater-or-equal"), get("greater"), get("smaller-or-equal"), get("smaller"), get("modulo"));
     private static final List<ParseType> COMPARATORS = Arrays.asList(get("equals"), get("not-equals"), get("or"), get("and"));
 
     private Object evalMultiple(RunContext context, List<ParseResult> results) {
@@ -377,6 +398,9 @@ public class Runner {
                         if (type.equals(get("division"))) {
                             return leftNum.doubleValue() / rightNum.doubleValue();
                         }
+                        if (type.equals(get("modulo"))) {
+                            return leftNum.doubleValue() % rightNum.doubleValue();
+                        }
                     }
                 }
                 error(results);
@@ -385,7 +409,7 @@ public class Runner {
                 Object left = eval(context, results.get(0));
                 Supplier<Object> right = () -> evalMultiple(context, results.subList(2, results.size()));
                 if (type.equals(get("equals")) || type.equals(get("not-equal"))) {
-                    boolean equal = left == right.get();
+                    boolean equal = Objects.equals(left, right.get());
                     if (type.equals(get("equals"))) {
                         return equal;
                     } else {
@@ -417,6 +441,9 @@ public class Runner {
                     }
                 }
             }
+            if (results.get(0).typeOf(get("variable"))) {
+
+            }
             if (results.get(0).getType().equals(get("variable"))) {
                 Variable var = context.getOrCreateVariable(results.get(0).getText());
                 if (results.get(1).getType().equals(get("assignment"))) {
@@ -427,7 +454,7 @@ public class Runner {
             }
         }
 
-        throw new RuntimeException("Couldn't run: " + results + "");
+        throw new RuntimeException("Couldn't run: " + results);
     }
 
     private Object wrappedEvalMultiple(RunContext context, Object val, List<ParseResult> results, int from) {

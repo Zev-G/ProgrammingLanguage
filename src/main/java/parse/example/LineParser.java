@@ -8,12 +8,15 @@ import java.util.List;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static parse.example.TypeRegistry.get;
 
 public class LineParser extends ParserBranch {
 
     public static final ParseType TYPE = get("line");
+
+    private static final List<ParseType> WRAP_SIDES_WITH_PARENS = Arrays.asList(get("equals"), get("not-equal"));
 
     private final MultiLineParser multiLineParser;
 
@@ -57,7 +60,7 @@ public class LineParser extends ParserBranch {
                 new Literal("true", get("true")), new Literal("false", get("false")),
 
                 new Literal("++", get("increment")), new Literal("--", get("decrement")), new Literal("**", get("square")),
-                new Literal("+", get("plus")), new Literal("-", get("minus")), new Literal("*", get("times")), new Literal("/", get("division")),
+                new Literal("+", get("plus")), new Literal("-", get("minus")), new Literal("*", get("times")), new Literal("/", get("division")),  new Literal("%", get("modulo")),
 
                 new Literal(">=", get("greater-or-equal")), new Literal(">", get("greater")), new Literal("<=", get("smaller-or-equal")), new Literal("<", get("smaller")),
                 new Literal("||", get("or")), new Literal("|", get("or")), new Literal("&&", get("and")), new Literal("&", get("and")),
@@ -186,17 +189,14 @@ public class LineParser extends ParserBranch {
             }
         }
 
-        System.out.println(results);
-
         if (inString || inChar) {
             throw new RuntimeException("Text wasn't closed at pos: " + state);
         }
 
-        // Map all variables in front of groupings to method-names.
-
         if (results.isEmpty()) {
             return Optional.empty();
         } else {
+            // Map all variables in front of groupings to method-names.
             for (int i = 0, length = results.size() - 1; i < length; i++) {
                 ParseResult at = results.get(i);
                 ParseResult after = results.get(i + 1);
@@ -206,7 +206,29 @@ public class LineParser extends ParserBranch {
                     i++;
                 }
             }
-            return Optional.of(new ParseResult(TYPE, text, results));
+            List<ParseResult> newResults = new ArrayList<>();
+
+            List<ParseResult> bufferList = new ArrayList<>();
+            boolean wrapRemaining = false;
+            for (ParseResult result : results) {
+                if (WRAP_SIDES_WITH_PARENS.contains(result.getType())) {
+                    System.out.println("happened");
+                    newResults.add(new ParseResult(get("grouping"), bufferList.stream().map(Object::toString).collect(Collectors.joining(" ")), bufferList));
+                    bufferList.clear();
+                    wrapRemaining = true;
+                    newResults.add(result);
+                    continue;
+                }
+                bufferList.add(result);
+            }
+            if (!bufferList.isEmpty()) {
+                if (wrapRemaining) {
+                    newResults.add(new ParseResult(get("grouping"), bufferList.stream().map(Object::toString).collect(Collectors.joining(" ")), bufferList));
+                } else {
+                    newResults.addAll(bufferList);
+                }
+            }
+            return Optional.of(new ParseResult(TYPE, text, newResults));
         }
     }
 
