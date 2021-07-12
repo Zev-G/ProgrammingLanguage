@@ -61,9 +61,9 @@ public class LineParser extends ParserBranch {
                 new Literal(">=", get("greater-or-equal")), new Literal(">", get("greater")), new Literal("<=", get("smaller-or-equal")), new Literal("<", get("smaller")),
                 new Literal("||", get("or")), new Literal("|", get("or")), new Literal("&&", get("and")), new Literal("&", get("and")),
                 new Literal("==", get("equals")), new Literal("!=", get("not-equal")), new Literal("=", get("assignment")),
-                new Literal("!", get("negate")),
+                new Literal("!", get("negate")), new Literal(";", get("semicolon")),
 
-                new Regex("[^ \n\r=!(),*-+/.]+", get("variable"))
+                new Regex("[^ \n\r=!(),*-+/.;{}]+", get("variable"))
         ));
     }
 

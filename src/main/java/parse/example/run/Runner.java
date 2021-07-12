@@ -133,7 +133,7 @@ public class Runner {
                     throw new RuntimeException("Couldn't evaluate: \"" + headerLine.getText().trim() + "\" as boolean.");
                 }
             }
-            if (headerLine.getChildren().get(0).typeOf(get("else"))) {
+            if (defining.typeOf(get("else"))) {
                 if (context.isReadyForElse()) {
                     context.setReadyForElse(false);
                     return run(newContext, body);
@@ -141,6 +141,38 @@ public class Runner {
                     return null;
                 }
             }
+            if (defining.typeOf(get("for"))) {
+                if (headerLine.getChildren().size() != 2 || !headerLine.getChildren().get(1).typeOf(get("grouping"))) {
+                    throw new RuntimeException("No parentheses used in for statement in: " + defining);
+                }
+                List<List<ParseResult>> separatedSections = new ArrayList<>();
+                List<ParseResult> buffer = new ArrayList<>();
+                for (ParseResult result : headerLine.getChildren().get(1).getChildren()) {
+                    if (result.typeOf(get("semicolon"))) {
+                        separatedSections.add(new ArrayList<>(buffer));
+                        buffer.clear();
+                    } else {
+                        buffer.add(result);
+                    }
+                }
+                if (!buffer.isEmpty()) {
+                    separatedSections.add(buffer);
+                }
+                if (separatedSections.size() == 3) {
+                    List<ParseResult> runFirst = separatedSections.get(0);
+                    List<ParseResult> checkEachTime = separatedSections.get(1);
+                    List<ParseResult> runAfter = separatedSections.get(2);
+
+                    Object last = null;
+                    for (evalMultiple(newContext, runFirst); (Boolean) evalMultiple(newContext, checkEachTime); evalMultiple(newContext, runAfter)) {
+                        last = run(new RunContext(newContext), body);
+                    }
+                    return last;
+                } else {
+                    throw new RuntimeException("Invalid inputs in for statement: " + header);
+                }
+            }
+
         }
         throw new RuntimeException("Couldn't run statement: " + header + " " + body);
     }

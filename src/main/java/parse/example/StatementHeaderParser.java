@@ -7,10 +7,9 @@ import java.util.stream.Collectors;
 
 public class StatementHeaderParser extends ParserBranch {
 
-    private static final List<String> BANNED_FUNCTION_NAMES = Arrays.asList("if", "else", "else if", "elif");
+    private static final List<String> BANNED_FUNCTION_NAMES = Arrays.asList("if", "else", "else if", "elif", "for", "while");
 
     private final LineParser lineParser;
-
 
     private final Parser methodDeclarationParser = (text, state) -> {
         StringBuilder buffer = new StringBuilder();
@@ -84,6 +83,7 @@ public class StatementHeaderParser extends ParserBranch {
         this.lineParser.getPortions().add(0, new LineParser.Literal("else", TypeRegistry.get("else")));
         this.lineParser.getPortions().add(0, new LineParser.Literal("else if", TypeRegistry.get("elif")));
         this.lineParser.getPortions().add(0, new LineParser.Literal("elif", TypeRegistry.get("elif")));
+        this.lineParser.getPortions().add(0, new LineParser.Literal("for", TypeRegistry.get("for")));
     }
 
     @Override

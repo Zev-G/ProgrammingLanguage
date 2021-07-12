@@ -59,6 +59,7 @@ public class MultiLineParser extends RedirectParserBranch {
             // -------------- Loop Variables ----------------
             int at = 0;
             int within = 0;
+            int withinParens = 0;
             int line = 0;
             int onLine = 0;
 
@@ -149,6 +150,18 @@ public class MultiLineParser extends RedirectParserBranch {
 
                     if (!inText) {
 
+                        // Handle open parentheses.
+                        if (currentChar == '(') {
+                            withinParens++;
+                            checkedChar = true;
+                        }
+
+                        // Handle closing parentheses.
+                        if (currentChar == ')') {
+                            withinParens--;
+                            checkedChar = true;
+                        }
+
                         // Handle open brackets.
                         if (currentChar == '{') {
                             within++;
@@ -173,7 +186,7 @@ public class MultiLineParser extends RedirectParserBranch {
                         }
 
                         // If at original depth.
-                        if (within == 0) {
+                        if (within == 0 && withinParens == 0) {
                             // Check if loop is on line separating character.
                             if (!checkedChar && currentChar == lineSeparatingChar) {
                                 // Add current line.
