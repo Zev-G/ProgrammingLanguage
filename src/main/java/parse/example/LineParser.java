@@ -2,10 +2,7 @@ package parse.example;
 
 import parse.*;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -15,9 +12,10 @@ import static parse.example.TypeRegistry.get;
 public class LineParser extends ParserBranch {
 
     public static final ParseType TYPE = get("line");
+    private static final ParseType GROUPING = get("grouping");
 
-    private static final List<ParseType> WRAP_SIDES_WITH_PARENS = Arrays.asList(get("equals"), get("not-equal"), get("plus"), get("minus"), get("times"), get("division"), get("modulo"));
-    private static final List<ParseType> SEPARATORS = Arrays.asList(get("semicolon"), get("separator"));
+    private static final List<ParseType> WRAP_SIDES_WITH_PARENS = Arrays.asList(get("equals"), get("not-equal"), get("plus"), get("minus"), get("times"), get("division"), get("modulo"), get("period"));
+    private static final List<ParseType> SEPARATORS = Arrays.asList(get("semicolon"), get("separator"), get("assignment"), get("return"), get("new"));
 
     private final MultiLineParser multiLineParser;
 
@@ -35,27 +33,32 @@ public class LineParser extends ParserBranch {
                     public int find(String text) {
                         StringBuilder valid = new StringBuilder();
                         boolean decimal = false;
+                        boolean foundNum = false;
                         for (String charPoint : text.split("")) {
                             if (!charPoint.toLowerCase().equals(charPoint.toUpperCase())) {
                                 break;
                             }
                             if (charPoint.equals(".")) {
-                                if (decimal) {
+                                if (decimal || !foundNum) {
                                     break;
                                 }
                                 decimal = true;
+                                foundNum = false;
                             } else if (!charPoint.matches("[0-9]")) {
                                 break;
+                            } else {
+                                foundNum = true;
                             }
                             valid.append(charPoint);
                         }
                         String value = valid.toString();
-                        if (value.isEmpty()) {
+                        if (value.isEmpty() || !foundNum) {
                             return -1;
                         }
                         return value.length();
                     }
                 },
+                new Literal(".", get("period")),
 
                 new Literal("return", get("return")),
                 new Literal("true", get("true")), new Literal("false", get("false")),
@@ -207,41 +210,70 @@ public class LineParser extends ParserBranch {
                     i++;
                 }
             }
-            List<ParseResult> newResults = new ArrayList<>();
 
-            List<ParseResult> bufferList = new ArrayList<>();
-            boolean wrapRemaining = false;
-            for (ParseResult result : results) {
-                if (WRAP_SIDES_WITH_PARENS.contains(result.getType())) {
-                    newResults.add(new ParseResult(get("grouping"), bufferList.stream().map(Object::toString).collect(Collectors.joining(" ")), bufferList));
-                    bufferList.clear();
-                    wrapRemaining = true;
-                    newResults.add(result);
-                    continue;
-                }
-                if (SEPARATORS.contains(result.getType())) {
-                    if (wrapRemaining) {
-                        newResults.add(new ParseResult(get("grouping"), bufferList.stream().map(Object::toString).collect(Collectors.joining(" ")), bufferList));
-                    } else {
-                        newResults.addAll(bufferList);
-                    }
-                    bufferList.clear();
-                    wrapRemaining = false;
-                    newResults.add(result);
-                    continue;
-                }
-                bufferList.add(result);
-            }
-            if (!bufferList.isEmpty()) {
-                if (wrapRemaining) {
-                    newResults.add(new ParseResult(get("grouping"), bufferList.stream().map(Object::toString).collect(Collectors.joining(" ")), bufferList));
-                } else {
-                    newResults.addAll(bufferList);
-                }
-            }
-
-            return Optional.of(new ParseResult(TYPE, text, newResults));
+            return Optional.of(new ParseResult(TYPE, text, group(results)));
         }
+    }
+
+    private List<ParseResult> group(List<ParseResult> results) {
+        List<ParseResult> newResults = new ArrayList<>();
+
+        int lastAdded = 0;
+        boolean wrapIntoBuffer = false;
+        List<ParseResult> buffer = new ArrayList<>();
+
+        for (int i = 0, length = results.size(); i < length; i++) {
+            ParseResult result = results.get(i);
+
+            if (WRAP_SIDES_WITH_PARENS.contains(result.getType())) {
+                List<ParseResult> subList = results.subList(lastAdded, i);
+                buffer.add(wrapWithGrouping(subList));
+                if (wrapIntoBuffer) {
+                    ParseResult add = wrapWithGrouping(buffer);
+                    buffer.clear();
+                    buffer.add(add);
+                }
+                buffer.add(result);
+                wrapIntoBuffer = true;
+                lastAdded = i + 1;
+                continue;
+            }
+
+            if (SEPARATORS.contains(result.getType())) {
+                List<ParseResult> subList = results.subList(lastAdded, i);
+                if (wrapIntoBuffer) {
+                    buffer.add(wrapWithGrouping(subList));
+                    newResults.addAll(buffer);
+                } else {
+                    newResults.addAll(buffer);
+                    newResults.addAll(subList);
+                }
+                buffer.clear();
+                newResults.add(result);
+                wrapIntoBuffer = false;
+                lastAdded = i + 1;
+            }
+
+        }
+
+        if (lastAdded != results.size() || !buffer.isEmpty()) {
+            List<ParseResult> subList = results.subList(lastAdded, results.size());
+            if (wrapIntoBuffer) {
+                if (!subList.isEmpty()) {
+                    buffer.add(wrapWithGrouping(subList));
+                }
+                newResults.addAll(buffer);
+            } else {
+                newResults.addAll(buffer);
+                newResults.addAll(subList);
+            }
+        }
+
+        return newResults;
+    }
+
+    private static ParseResult wrapWithGrouping(Collection<ParseResult> results) {
+        return new ParseResult(GROUPING, "(" + results.stream().map(Objects::toString).collect(Collectors.joining(" ")) + ")", results);
     }
 
     public List<Portion> getPortions() {

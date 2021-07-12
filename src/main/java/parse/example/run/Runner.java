@@ -5,7 +5,12 @@ import parse.ParseResult;
 import parse.ParseType;
 import parse.example.MultiLineParser;
 import parse.example.TypeRegistry;
+import parse.example.reflect.ReflectionUtils;
 
+import java.io.PrintStream;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -24,19 +29,20 @@ import static parse.example.TypeRegistry.get;
 public class Runner {
 
     private final RunContext global = new RunContext();
+    private PrintStream out = System.out;
 
     public Runner() {
         global.registerFunction("print", new Function(Collections.singleton("text")) {
             @Override
             public Object run(RunContext context, Object... params) {
-                System.out.print(params[0]);
+                out.print(params[0]);
                 return null;
             }
         });
         global.registerFunction("println", new Function(Collections.singleton("text")) {
             @Override
             public Object run(RunContext context, Object... params) {
-                System.out.println(params[0]);
+                out.println(params[0]);
                 return null;
             }
         });
@@ -119,6 +125,14 @@ public class Runner {
                 }
             }
         });
+    }
+
+    public void setOut(PrintStream out) {
+        this.out = out;
+    }
+
+    public PrintStream getOut() {
+        return out;
     }
 
     private Object runStatement(RunContext context, ParseResult header, ParseResult body) {
@@ -316,23 +330,7 @@ public class Runner {
                     if (function.isEmpty()) {
                         throw new RuntimeException("No function with name: \"" + results.get(0).getText() + "\" exists.");
                     }
-                    List<List<ParseResult>> arguments = new ArrayList<>();
-                    List<ParseResult> buffer = new ArrayList<>();
-                    for (ParseResult result : results.get(1).getChildren()) {
-                        if (result.typeOf(get("separator"))) {
-                            arguments.add(buffer);
-                            buffer.clear();
-                        } else {
-                            buffer.add(result);
-                        }
-                    }
-                    if (!buffer.isEmpty()) {
-                        arguments.add(buffer);
-                    }
-                    if (arguments.size() != function.get().getParams().size() && !function.get().isUsingAnyArguments()) {
-                        throw new RuntimeException("Invalid number of parameters in call to function named: " + results.get(0).getText() + ". Found " + arguments.size() + " expected " + function.get().getParams().size());
-                    }
-                    return function.get().run(context, arguments.stream().map(list -> evalMultiple(context, list)).toArray());
+                    return function.get().run(context, computeMethodParameters(results.get(1).getChildren(), results.get(0).getText(), context, function.get().getParams().size()).toArray());
                 } else {
                     throw new RuntimeException("No arguments for method call to method named: " + results.get(0).getText());
                 }
@@ -468,6 +466,31 @@ public class Runner {
                     }
                 }
             }
+            if (type.equals(get("period"))) {
+                if (left == UNSET) {
+                    left = eval(context, results.get(0));
+                }
+                List<ParseResult> member = collapseGrouping(results.get(2));
+                if (member.size() == 2) {
+                    // Method
+                    String methodName = member.get(0).getText();
+                    List<Object> arguments = computeMethodParameters(member.get(1).getChildren(), methodName, context);
+
+                    Optional<Method> method = ReflectionUtils.findMethod(left, methodName, arguments.toArray());
+                    if (method.isEmpty()) {
+                        throw new RuntimeException("No method exists on object: \"" + left + "\" named: \"" + methodName + "\" which matches arguments: " + arguments);
+                    }
+                    try {
+                        return invoke(method.get(), left, arguments.toArray());
+                    } catch (IllegalAccessException e) {
+                        throw new RuntimeException("Can't access method " + methodName + ".");
+                    } catch (InvocationTargetException e) {
+                        throw new RuntimeException("No method exists on object: \"" + left + "\" named: \"" + methodName + "\" which matches arguments: " + arguments);
+                    }
+                } else {
+                    // Field
+                }
+            }
             if (results.get(0).getType().equals(get("variable"))) {
                 Variable var = context.getOrCreateVariable(results.get(0).getText());
                 if (results.get(1).getType().equals(get("assignment"))) {
@@ -479,6 +502,74 @@ public class Runner {
         }
 
         throw new RuntimeException("Couldn't run: " + results);
+    }
+
+    private Object invoke(Method method, Object obj, Object[] args) throws InvocationTargetException, IllegalAccessException {
+        int at = 0;
+        for (Parameter param : method.getParameters()) {
+            if (param.isVarArgs()) {
+                Class<?> type = param.getType();
+                for (; at < args.length; at++) {
+                    Object val = args[at];
+                    if (val == null) continue;
+                    if (ReflectionUtils.isNum(type)) {
+                        if (ReflectionUtils.isNum(val.getClass())) {
+                            args[at] = ReflectionUtils.castNumber((Number) val, type);
+                            continue;
+                        }
+                    }
+                    if (!type.isAssignableFrom(val.getClass())) {
+                        break;
+                    }
+                }
+            } else {
+                if (args[at] != null) {
+                    Class<?> type = param.getType();
+                    if (ReflectionUtils.isNum(type) && ReflectionUtils.isNum(args[at].getClass())) {
+                        args[at] = ReflectionUtils.castNumber((Number) args[at], type);
+                    }
+                }
+                at++;
+            }
+        }
+        return method.invoke(obj, args);
+    }
+
+    private List<Object> computeMethodParameters(List<ParseResult> params, String methodName, RunContext context) {
+        return computeMethodParameters(params, methodName, context, -1);
+    }
+    private List<Object> computeMethodParameters(List<ParseResult> params, String methodName, RunContext context, int expected) {
+        List<List<ParseResult>> arguments = new ArrayList<>();
+        List<ParseResult> buffer = new ArrayList<>();
+        for (ParseResult result : params) {
+            if (result.typeOf(get("separator"))) {
+                arguments.add(buffer);
+                buffer.clear();
+            } else {
+                buffer.add(result);
+            }
+        }
+        if (!buffer.isEmpty()) {
+            arguments.add(buffer);
+        }
+        if (expected > 0 && arguments.size() != expected) {
+            throw new RuntimeException("Invalid number of parameters in call to function named: " + methodName + ". Found " + arguments.size() + " expected " + expected);
+        }
+        return arguments.stream().map(results -> evalMultiple(context, results)).collect(Collectors.toList());
+    }
+
+    private static final ParseType GROUPING = get("grouping");
+    private static List<ParseResult> collapseGrouping(ParseResult result) {
+        if (result.typeOf(GROUPING)) {
+            List<ParseResult> children = result.getChildren();
+            if (children.size() == 1 && children.get(0).typeOf(GROUPING)) {
+                return collapseGrouping(children.get(0));
+            } else {
+                return children;
+            }
+        } else {
+            throw new IllegalArgumentException("ParseResult's type doesn't equal typeOf grouping.");
+        }
     }
 
     private Object wrappedEvalMultiple(RunContext context, Object val, List<ParseResult> results, int from) {
