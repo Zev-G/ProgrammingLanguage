@@ -16,7 +16,8 @@ public class LineParser extends ParserBranch {
 
     public static final ParseType TYPE = get("line");
 
-    private static final List<ParseType> WRAP_SIDES_WITH_PARENS = Arrays.asList(get("equals"), get("not-equal"));
+    private static final List<ParseType> WRAP_SIDES_WITH_PARENS = Arrays.asList(get("equals"), get("not-equal"), get("plus"), get("minus"), get("times"), get("division"), get("modulo"));
+    private static final List<ParseType> SEPARATORS = Arrays.asList(get("semicolon"), get("separator"));
 
     private final MultiLineParser multiLineParser;
 
@@ -67,7 +68,7 @@ public class LineParser extends ParserBranch {
                 new Literal("==", get("equals")), new Literal("!=", get("not-equal")), new Literal("=", get("assignment")),
                 new Literal("!", get("negate")), new Literal(";", get("semicolon")),
 
-                new Regex("[^ \n\r=!(),*-+/.;{}]+", get("variable"))
+                new Regex("[^ \n\r=!(),*-+/.;{}<>]+", get("variable"))
         ));
     }
 
@@ -212,10 +213,20 @@ public class LineParser extends ParserBranch {
             boolean wrapRemaining = false;
             for (ParseResult result : results) {
                 if (WRAP_SIDES_WITH_PARENS.contains(result.getType())) {
-                    System.out.println("happened");
                     newResults.add(new ParseResult(get("grouping"), bufferList.stream().map(Object::toString).collect(Collectors.joining(" ")), bufferList));
                     bufferList.clear();
                     wrapRemaining = true;
+                    newResults.add(result);
+                    continue;
+                }
+                if (SEPARATORS.contains(result.getType())) {
+                    if (wrapRemaining) {
+                        newResults.add(new ParseResult(get("grouping"), bufferList.stream().map(Object::toString).collect(Collectors.joining(" ")), bufferList));
+                    } else {
+                        newResults.addAll(bufferList);
+                    }
+                    bufferList.clear();
+                    wrapRemaining = false;
                     newResults.add(result);
                     continue;
                 }
@@ -228,6 +239,7 @@ public class LineParser extends ParserBranch {
                     newResults.addAll(bufferList);
                 }
             }
+
             return Optional.of(new ParseResult(TYPE, text, newResults));
         }
     }

@@ -7,7 +7,6 @@ import parse.example.MultiLineParser;
 import parse.example.TypeRegistry;
 
 import java.util.*;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import static parse.example.TypeRegistry.get;
@@ -28,6 +27,13 @@ public class Runner {
 
     public Runner() {
         global.registerFunction("print", new Function(Collections.singleton("text")) {
+            @Override
+            public Object run(RunContext context, Object... params) {
+                System.out.print(params[0]);
+                return null;
+            }
+        });
+        global.registerFunction("println", new Function(Collections.singleton("text")) {
             @Override
             public Object run(RunContext context, Object... params) {
                 System.out.println(params[0]);
@@ -227,6 +233,7 @@ public class Runner {
     private static final List<ParseType> STRING_TYPES = Arrays.asList(get("plus"), get("times"));
     private static final List<ParseType> MATH_TYPES = Arrays.asList(get("plus"), get("minus"), get("times"), get("division"), get("greater-or-equal"), get("greater"), get("smaller-or-equal"), get("smaller"), get("modulo"));
     private static final List<ParseType> COMPARATORS = Arrays.asList(get("equals"), get("not-equals"), get("or"), get("and"));
+    private static final Object UNSET = new Object();
 
     private Object evalMultiple(RunContext context, List<ParseResult> results) {
         if (results.size() == 1) return eval(context, results.get(0));
@@ -309,20 +316,23 @@ public class Runner {
                     if (function.isEmpty()) {
                         throw new RuntimeException("No function with name: \"" + results.get(0).getText() + "\" exists.");
                     }
-                    List<Object> arguments = new ArrayList<>();
+                    List<List<ParseResult>> arguments = new ArrayList<>();
                     List<ParseResult> buffer = new ArrayList<>();
                     for (ParseResult result : results.get(1).getChildren()) {
                         if (result.typeOf(get("separator"))) {
-                            arguments.add(evalMultiple(context, buffer));
+                            arguments.add(buffer);
                             buffer.clear();
                         } else {
                             buffer.add(result);
                         }
                     }
                     if (!buffer.isEmpty()) {
-                        arguments.add(evalMultiple(context, buffer));
+                        arguments.add(buffer);
                     }
-                    return function.get().run(context, arguments.toArray());
+                    if (arguments.size() != function.get().getParams().size() && !function.get().isUsingAnyArguments()) {
+                        throw new RuntimeException("Invalid number of parameters in call to function named: " + results.get(0).getText() + ". Found " + arguments.size() + " expected " + function.get().getParams().size());
+                    }
+                    return function.get().run(context, arguments.stream().map(list -> evalMultiple(context, list)).toArray());
                 } else {
                     throw new RuntimeException("No arguments for method call to method named: " + results.get(0).getText());
                 }
@@ -352,25 +362,32 @@ public class Runner {
 
         if (results.size() >= 3) {
             ParseType type = results.get(1).getType();
+            Object left = UNSET;
+            Object right = UNSET;
             if (STRING_TYPES.contains(type)) {
-                Object left = eval(context, results.get(0));
-                if (left instanceof String) {
+                left = eval(context, results.get(0));
+                right = evalMultiple(context, results.subList(2, results.size()));
+                if (left instanceof String || right instanceof String) {
                     if (type.equals(get("plus"))) {
-                        String right = String.valueOf(evalMultiple(context, results.subList(2, results.size())));
-                        return left + right;
+                        return left + String.valueOf(right);
                     }
-                    if (type.equals(get("times"))) {
-                        Object right = evalMultiple(context, results.subList(2, results.size()));
-                        if (right instanceof Number) {
-                            return ((String) left).repeat(((Number) right).intValue());
+                    if (left instanceof String) {
+                        if (type.equals(get("times"))) {
+                            if (right instanceof Number) {
+                                return ((String) left).repeat(((Number) right).intValue());
+                            }
                         }
                     }
                 }
             }
             if (MATH_TYPES.contains(type)) {
-                Object left = eval(context, results.get(0));
+                if (left == UNSET) {
+                    left = eval(context, results.get(0));
+                }
                 if (left instanceof Number) {
-                    Object right = evalMultiple(context, results.subList(2, results.size()));
+                    if (right == UNSET) {
+                        right = evalMultiple(context, results.subList(2, results.size()));
+                    }
                     if (right instanceof Number) {
                         Number leftNum = (Number) left;
                         Number rightNum = (Number) right;
@@ -406,10 +423,14 @@ public class Runner {
                 error(results);
             }
             if (COMPARATORS.contains(type)) {
-                Object left = eval(context, results.get(0));
-                Supplier<Object> right = () -> evalMultiple(context, results.subList(2, results.size()));
+                if (left == UNSET) {
+                    left = eval(context, results.get(0));
+                }
                 if (type.equals(get("equals")) || type.equals(get("not-equal"))) {
-                    boolean equal = Objects.equals(left, right.get());
+                    if (right == UNSET) {
+                        right = evalMultiple(context, results.subList(2, results.size()));
+                    }
+                    boolean equal = Objects.equals(left, right);
                     if (type.equals(get("equals"))) {
                         return equal;
                     } else {
@@ -422,7 +443,10 @@ public class Runner {
                         if (results.get(1).getText().equals("&&") && !leftVal) {
                             return false;
                         }
-                        Object rightObj = right.get();
+                        if (right == UNSET) {
+                            right = evalMultiple(context, results.subList(2, results.size()));
+                        }
+                        Object rightObj = right;
                         if (rightObj instanceof Boolean) {
                             return leftVal && (Boolean) rightObj;
                         }
@@ -434,15 +458,15 @@ public class Runner {
                         if (results.get(1).getText().equals("|") && leftVal) {
                             return true;
                         }
-                        Object rightObj = right.get();
+                        if (right == UNSET) {
+                            right = evalMultiple(context, results.subList(2, results.size()));
+                        }
+                        Object rightObj = right;
                         if (rightObj instanceof Boolean) {
                             return leftVal || (Boolean) rightObj;
                         }
                     }
                 }
-            }
-            if (results.get(0).typeOf(get("variable"))) {
-
             }
             if (results.get(0).getType().equals(get("variable"))) {
                 Variable var = context.getOrCreateVariable(results.get(0).getText());
