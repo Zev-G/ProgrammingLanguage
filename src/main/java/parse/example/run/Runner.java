@@ -28,7 +28,7 @@ import static parse.example.TypeRegistry.get;
  * </ul>
  * <h1>To be fixed:</h1>
  * <ul>
- *     <li>Negative numbers broken again. Seems to be due to negative signs being WRAP_SIDES_WITH_PARENS in {@link parse.example.LineParser}</li>
+ *     <li>(DONE) Negative numbers broken again. Seems to be due to negative signs being WRAP_SIDES_WITH_PARENS in {@link parse.example.LineParser}</li>
  * </ul>
  */
 public class Runner {

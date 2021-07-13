@@ -32,6 +32,11 @@ public class LineParser extends ParserBranch {
                     @Override
                     public int find(String text) {
                         StringBuilder valid = new StringBuilder();
+                        boolean negative = false;
+                        if (text.startsWith("-")) {
+                            negative = true;
+                            text = text.substring(1);
+                        }
                         boolean decimal = false;
                         boolean foundNum = false;
                         for (String charPoint : text.split("")) {
@@ -55,7 +60,7 @@ public class LineParser extends ParserBranch {
                         if (value.isEmpty() || !foundNum) {
                             return -1;
                         }
-                        return value.length();
+                        return negative ? value.length() + 1 : value.length();
                     }
                 },
                 new Literal(".", get("period")),
@@ -227,7 +232,9 @@ public class LineParser extends ParserBranch {
 
             if (WRAP_SIDES_WITH_PARENS.contains(result.getType())) {
                 List<ParseResult> subList = results.subList(lastAdded, i);
-                buffer.add(wrapWithGrouping(subList));
+                if (!subList.isEmpty()) {
+                    buffer.add(wrapWithGrouping(subList));
+                }
                 if (wrapIntoBuffer) {
                     ParseResult add = wrapWithGrouping(buffer);
                     buffer.clear();
@@ -272,7 +279,10 @@ public class LineParser extends ParserBranch {
         return newResults;
     }
 
-    private static ParseResult wrapWithGrouping(Collection<ParseResult> results) {
+    private static ParseResult wrapWithGrouping(List<ParseResult> results) {
+        if (results.size() == 1 && results.get(0).typeOf(GROUPING)) {
+            return results.get(0);
+        }
         return new ParseResult(GROUPING, "(" + results.stream().map(Objects::toString).collect(Collectors.joining(" ")) + ")", results);
     }
 

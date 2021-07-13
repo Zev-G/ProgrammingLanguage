@@ -1,5 +1,2 @@
-println(test());
-
-test() {
-    return 1;
-}
+x = -(1 * 50);
+println(x);
