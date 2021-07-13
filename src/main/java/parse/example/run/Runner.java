@@ -22,8 +22,13 @@ import static parse.example.TypeRegistry.get;
  *     <li>(DONE) Modulo</li>
  *     <li>(DONE) While Loops</li>
  *     <li>Times equal (*=), divide equals (/=), etc.</li>
- *     <li>Fields and methods of objects.</li>
+ *     <li>(DONE) Methods of objects.</li>
+ *     <li>Fields of objects.</li>
  *     <li>Accessing java classes.</li>
+ * </ul>
+ * <h1>To be fixed:</h1>
+ * <ul>
+ *     <li>Negative numbers broken again. Seems to be due to negative signs being WRAP_SIDES_WITH_PARENS in {@link parse.example.LineParser}</li>
  * </ul>
  */
 public class Runner {
