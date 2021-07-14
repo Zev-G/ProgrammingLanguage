@@ -82,7 +82,7 @@ hi
 If statements are the text "if " followed by a boolean statement, parentheses are optional.
 
 Example:
-```
+```java
 if true {
     println("A");
 }
