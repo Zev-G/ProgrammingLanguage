@@ -206,12 +206,105 @@ join(x, y) {
 }
 ```
 
-## Calling functions
+### Calling functions
 
 To call a function write its name then parentheses containing the arguments separated by commas.
 ```java
 x = squared(3);
 y = join("hello", "world");
+```
+
+## Accessing java classes, methods, and fields.
+
+> Inner classes cannot be accessed.
+
+### Imports
+
+Packages `java.lang` and `java.util` are imported automatically, all other packages must be imported manually. 
+Imports must go at the beginning of the file. 
+You can only import packages and classes. 
+
+Imports are written as the text "import " followed by the package, then either a particular public class in the package or all classes in the package (*).
+
+Example:
+```java
+import java.io.*;
+import java.nio.files.*;
+```
+
+### Methods
+
+An object's methods can be ran by writing a period after the object, then the name of the method, then, in parentheses, the arguments separated by commas.
+
+Example:
+```java
+println("hi".toUpperCase());
+println("hi ".repeat(3));
+```
+Output:
+```
+HI
+hi hi hi
+```
+
+Static methods of classes can be ran by writing the class' name in substitution for the object in the above syntax.
+
+Example:
+```java
+println(Math.random());
+println("Since this is printing a random number the output won't often be the same.");
+```
+Output:
+```
+0.7958408649703334
+Since this is printing a random number the output won't often be the same.
+```
+
+Notes:  
+
+Varargs are handled automatically.  
+The superclass methods of an object are searched recursively until one which can be accessed is found.  
+All numbers are doubles in the language. Numbers are casted to the type specified by the method.  
+
+### Constructors
+
+Constructors can be ran by writing the keyword "new" followed by the name of the class then the arguments in parentheses separated by commas.
+
+Example:
+```java
+x = new ArrayList();
+```
+
+### Fields
+
+An object's fields can be accessed by writing a period after the object, followed by the name of the field.
+
+Example:
+```java
+println(new FakeClass().text);
+```
+
+Static fields of classes can be accessed by writing the name of the class in substitution for the object in the above syntax.
+
+Example:
+```java
+println(Integer.MAX_VALUE);
+```
+Output:
+```
+2147483647
+```
+
+The length of an array can be accessed by writing a period after the array, followed by the text "length"
+
+Example:
+```java
+array = "text".split("");
+println(array.length);
+```
+Output:
+```
+4
 ```
 
 # Examples
