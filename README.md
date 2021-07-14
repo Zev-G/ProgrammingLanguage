@@ -228,7 +228,7 @@ Imports are written as the text "import " followed by the package, then either a
 
 Example:
 ```java
-import java.io.*;
+import java.io.File;
 import java.nio.files.*;
 ```
 
