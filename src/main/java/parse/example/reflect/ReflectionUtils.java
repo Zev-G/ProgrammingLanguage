@@ -18,6 +18,7 @@ public final class ReflectionUtils {
         return findExecutable(methods, name, arguments);
     }
     public static Optional<Method> findAccessibleMethod(Object obj, String name, Object[] arguments) {
+        if (obj == null) return Optional.empty();
         return findAccessibleMethod(obj, obj.getClass(), name, arguments);
     }
     public static Optional<Method> findAccessibleMethod(Object obj, Class<?> search, String name, Object[] arguments) {

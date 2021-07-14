@@ -22,6 +22,7 @@ import static parse.example.TypeRegistry.get;
  *     <li>(DONE) Modulo</li>
  *     <li>(DONE) While Loops</li>
  *     <li>Times equal (*=), divide equals (/=), etc.</li>
+ *     <li>Negations</li>
  *     <li>(DONE) Methods of objects.</li>
  *     <li>(DONE) Fields of objects.</li>
  *     <li>(DONE) Accessing java classes.</li>
