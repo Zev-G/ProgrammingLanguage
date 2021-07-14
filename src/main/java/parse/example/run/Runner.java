@@ -23,7 +23,7 @@ import static parse.example.TypeRegistry.get;
  *     <li>(DONE) While Loops</li>
  *     <li>Times equal (*=), divide equals (/=), etc.</li>
  *     <li>(DONE) Methods of objects.</li>
- *     <li>Fields of objects.</li>
+ *     <li>(DONE) Fields of objects.</li>
  *     <li>(DONE) Accessing java classes.</li>
  * </ul>
  * <h1>To be fixed:</h1>
@@ -424,7 +424,32 @@ public class Runner {
                     left = eval(context, results.get(0));
                 }
                 List<ParseResult> member = results.subList(2, results.size());
-                if (member.size() >= 2) {
+                if (member.size() >= 1 && member.get(0).typeOf("variable")) {
+                    // Field
+                    String fieldName = member.get(0).getText();
+                    // Handle length of arrays.
+                    if (fieldName.equals("length") && left instanceof Object[]) {
+                        return wrappedEvalMultiple(context, ((Object[]) left).length, member, 1);
+                    }
+                    try {
+                        Field field;
+                        if (left instanceof StaticClass) {
+                            field = ((StaticClass) left).getRepresentedClass().getField(fieldName);
+                        } else {
+                            field = left.getClass().getField(fieldName);
+                        }
+                        try {
+                            if (Modifier.isStatic(field.getModifiers())) {
+                                left = null;
+                            }
+                            return wrappedEvalMultiple(context, field.get(left), member, 1);
+                        } catch (IllegalAccessException e) {
+                            throw new RuntimeException("Can't access field \"" + field + "\"");
+                        }
+                    } catch (NoSuchFieldException e) {
+                        throw new RuntimeException("No field named \"" + fieldName + "\" on " + left + ".");
+                    }
+                } else if (member.size() >= 2) {
                     // Method
                     String methodName = member.get(0).getText();
                     List<Object> arguments = computeMethodParameters(member.get(1).getChildren(), methodName, context);
@@ -454,8 +479,6 @@ public class Runner {
                     } catch (InvocationTargetException e) {
                         throw new RuntimeException("No method exists on object: \"" + left + "\" named: \"" + methodName + "\" which matches arguments: " + arguments);
                     }
-                } else {
-                    // Field
                 }
             }
             if (results.get(0).getType().equals(get("variable"))) {

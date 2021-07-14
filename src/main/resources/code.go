@@ -1,1 +1,1 @@
-println(Arrays.asList("aaaaa".split("")));
+System.out.println("test".split("").length);

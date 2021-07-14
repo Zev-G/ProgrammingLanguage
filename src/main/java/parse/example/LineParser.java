@@ -76,7 +76,7 @@ public class LineParser extends ParserBranch {
                 new Literal("==", get("equals")), new Literal("!=", get("not-equal")), new Literal("=", get("assignment")),
                 new Literal("!", get("negate")), new Literal(";", get("semicolon")),
 
-                new Regex("[^ \n\r=!(),*-+/.;{}<>]+", get("variable"))
+                new Regex("[$_A-z][$_A-z0-9]*", get("variable")) // This is matches the specification for a valid variable name excluding the no-keyword rule.
         ));
     }
 
