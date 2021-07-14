@@ -17,7 +17,7 @@ if (x < 50) {
 
 ## Comments
 
-Currently there is only support for single-line commnents. Single-line comments are declared with two forward slashed "//".
+Currently there is only support for single-line commnents. Single-line comments are declared with two forward slashes "//".
 > There are plans in the future to add support for multi-line comments.
 
 Example:
