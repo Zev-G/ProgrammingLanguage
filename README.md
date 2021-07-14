@@ -9,7 +9,7 @@ import javafx.scene.control.*;
 import javafx.scene.paint.*;
 import javafx.geometry.*;
 
-board = List.of("rnbqkbnr", "pppppppp", "", "", "", "", "RNBQKBNR", "PPPPPPPP");
+board = List.of("rnbqkbnr", "pppppppp", "", "", "", "", "PPPPPPPP", "RNBQKBNR");
 
 expandName(name) {
     name = name.toLowerCase();
@@ -38,15 +38,14 @@ expandName(name) {
 stage = new Stage();
 grid = new GridPane();
 for (y = 0; y < 8; y++) {
-    // This workaround is being used currently to get around an issue with varargs. This issue should be fixed in not too long and then we will be able to use Arrays.asList(...) instead here.
-    line = Arrays.stream(board.get(y).split("")).collect(Collectors.toList());
+    line = Arrays.asList(board.get(y).split(""));
     for (x = 0; x < 8; x++) {
         pane = new BorderPane();
         color;
         if ((x + y) % 2 == 0) {
-            color = Color.web("#000000");
+            color = Color.BLACK;
         } else {
-            color = Color.web("#ffffff");
+            color = Color.WHITE;
         }
         if (x < line.size()) {
             label = new Label(expandName(line.get(x)));
@@ -60,7 +59,8 @@ for (y = 0; y < 8; y++) {
 }
 stage.setScene(new Scene(grid));
 stage.show();
+
 ```
 This application requires the code to be run from within an already running JavaFX environment. 
 Result:
-[![img.png](img.png)]
+![](https://i.imgur.com/DH3AJNJ.png)
