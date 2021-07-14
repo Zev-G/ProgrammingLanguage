@@ -1,2 +1,2 @@
-x = -(1 * 50);
-println(x);
+
+println(System.currentTimeMillis());

@@ -7,7 +7,9 @@ import java.util.List;
 
 public class MultiLineParser extends RedirectParserBranch {
 
+    private final Parser importParser;
     private final Parser lineParser;
+
     private final Parser headerParser;
     private final StatementParser statementParser;
 
@@ -43,6 +45,7 @@ public class MultiLineParser extends RedirectParserBranch {
                 );
             }
         };
+        importParser = new ImportParser();
     }
 
     @Override
@@ -71,7 +74,7 @@ public class MultiLineParser extends RedirectParserBranch {
 
             String text;
             StringBuilder segmentBuilder = new StringBuilder();
-            List<ToBeParsed> portions = new ArrayList<>();
+            final List<ToBeParsed> portions = new ArrayList<>();
 
             @SuppressWarnings("ConstantConditions")
             ToBeParsed[] parse(String text, ParsePosition state) {
@@ -189,8 +192,13 @@ public class MultiLineParser extends RedirectParserBranch {
                         if (within == 0 && withinParens == 0) {
                             // Check if loop is on line separating character.
                             if (!checkedChar && currentChar == lineSeparatingChar) {
-                                // Add current line.
-                                addPortion(lineParser);
+                                // Determine if the added line is a normal line or an import line. If it is an import line parse it as such, otherwise parse it as a normal line.
+                                String line = segmentBuilder.toString();
+                                if (line.trim().startsWith("import")) {
+                                    addPortion(importParser);
+                                } else {
+                                    addPortion(lineParser);
+                                }
                                 continue;
                             }
                         }

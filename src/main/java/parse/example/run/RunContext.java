@@ -2,15 +2,14 @@ package parse.example.run;
 
 import parse.ParseResult;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.function.Supplier;
 
 public class RunContext {
 
     private final RunContext parent;
 
+    private final List<Import> imports = new ArrayList<>();
     private final Map<String, Variable> variables = new HashMap<>();
     private final Map<String, Function> functions = new HashMap<>();
 
@@ -21,6 +20,9 @@ public class RunContext {
     }
     public RunContext(RunContext parent) {
         this.parent = parent;
+        if (parent != null) {
+            this.imports.addAll(parent.getImports());
+        }
     }
 
     public Optional<Variable> getVariable(String text) {
@@ -55,6 +57,20 @@ public class RunContext {
             return parent.getFunction(text);
         }
         return Optional.of(function);
+    }
+
+    public Optional<Class<?>> findClass(String name) {
+        for (Import loopImport : imports) {
+            Optional<Class<?>> result = loopImport.findClass(name);
+            if (result.isPresent()) {
+                return result;
+            }
+        }
+        return Optional.empty();
+    }
+
+    List<Import> getImports() {
+        return imports;
     }
 
     public RunContext getParent() {

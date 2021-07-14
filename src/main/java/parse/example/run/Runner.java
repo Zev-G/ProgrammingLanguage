@@ -1,16 +1,16 @@
 package parse.example.run;
 
+import jdk.dynalink.beans.StaticClass;
 import parse.ParsePosition;
 import parse.ParseResult;
 import parse.ParseType;
+import parse.example.ImportParser;
 import parse.example.MultiLineParser;
 import parse.example.TypeRegistry;
 import parse.example.reflect.ReflectionUtils;
 
 import java.io.PrintStream;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Parameter;
+import java.lang.reflect.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -24,7 +24,7 @@ import static parse.example.TypeRegistry.get;
  *     <li>Times equal (*=), divide equals (/=), etc.</li>
  *     <li>(DONE) Methods of objects.</li>
  *     <li>Fields of objects.</li>
- *     <li>Accessing java classes.</li>
+ *     <li>(DONE) Accessing java classes.</li>
  * </ul>
  * <h1>To be fixed:</h1>
  * <ul>
@@ -59,15 +59,36 @@ public class Runner {
                 return parse.map(result -> Runner.this.run(context, result)).orElse(null);
             }
         });
+        global.getImports().add(Import.fromString("java.lang.*"));
     }
 
     public Object run(ParseResult result) {
+        // Look for imports
+        for (ParseResult child : result.getChildren()) {
+            if (child.typeOf(ImportParser.TYPE)) {
+                List<String> packages = new ArrayList<>();
+                for (ParseResult importElement : child.getChildren()) {
+                    if (importElement.typeOf(ImportParser.PACKAGE)) {
+                        packages.add(importElement.getText());
+                    } else if (importElement.typeOf(ImportParser.IMPORT_SUFFIX)) {
+                        global.getImports().add(new Import(packages.toArray(new String[0]), importElement.getText()));
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Run
         return run(global, result);
     }
     private Object run(RunContext context, ParseResult result) {
         // Check for illegal types.
         if (result.getType().equals(TypeRegistry.get("method-declaration"))) {
             throw new RuntimeException("Can't register function from this point.");
+        }
+        // Check for ignored types.
+        if (result.typeOf(ImportParser.TYPE)) {
+            return null;
         }
         // Check for method-declarations.
         for (ParseResult child : result.getChildren()) {
@@ -150,8 +171,8 @@ public class Runner {
                 return null;
             }
             ParseResult defining = headerLine.getChildren().get(0);
-            if (defining.typeOf(get("if")) || defining.typeOf(get("elif"))) {
-                if (defining.typeOf(get("elif")) && !context.isReadyForElse()) {
+            if (defining.typeOf("if") || defining.typeOf("elif")) {
+                if (defining.typeOf("elif") && !context.isReadyForElse()){
                     return null;
                 }
                 Object check = evalMultiple(context, headerLine.getChildren().subList(1, headerLine.getChildren().size()));
@@ -168,7 +189,7 @@ public class Runner {
                     throw new RuntimeException("Couldn't evaluate: \"" + headerLine.getText().trim() + "\" as boolean.");
                 }
             }
-            if (defining.typeOf(get("else"))) {
+            if (defining.typeOf("else")) {
                 if (context.isReadyForElse()) {
                     context.setReadyForElse(false);
                     return run(newContext, body);
@@ -176,14 +197,14 @@ public class Runner {
                     return null;
                 }
             }
-            if (defining.typeOf(get("for"))) {
-                if (headerLine.getChildren().size() != 2 || !headerLine.getChildren().get(1).typeOf(get("grouping"))) {
+            if (defining.typeOf("for")) {
+                if (headerLine.getChildren().size() != 2 || !headerLine.getChildren().get(1).typeOf("grouping")) {
                     throw new RuntimeException("No parentheses used in for statement in: " + defining);
                 }
                 List<List<ParseResult>> separatedSections = new ArrayList<>();
                 List<ParseResult> buffer = new ArrayList<>();
                 for (ParseResult result : headerLine.getChildren().get(1).getChildren()) {
-                    if (result.typeOf(get("semicolon"))) {
+                    if (result.typeOf("semicolon")) {
                         separatedSections.add(new ArrayList<>(buffer));
                         buffer.clear();
                     } else {
@@ -207,7 +228,7 @@ public class Runner {
                     throw new RuntimeException("Invalid inputs in for statement: " + header);
                 }
             }
-            if (defining.typeOf(get("while"))) {
+            if (defining.typeOf("while")) {
                 List<ParseResult> check = headerLine.getChildren().subList(1, headerLine.getChildren().size());
                 Object last = null;
                 while ((Boolean) evalMultiple(newContext, check)) {
@@ -232,7 +253,12 @@ public class Runner {
             return evalMultiple(context, result.getChildren());
         }
         if (type.equals(get("variable"))) {
-            return context.getOrCreateVariable(result.getText()).get();
+            Optional<Class<?>> asClass = context.findClass(result.getText());
+            if (asClass.isPresent()) {
+                return StaticClass.forClass(asClass.get());
+            } else {
+                return context.getOrCreateVariable(result.getText()).get();
+            }
         }
         if (type.equals(get("number"))) {
             return Double.parseDouble(result.getText());
@@ -256,117 +282,37 @@ public class Runner {
 
     private Object evalMultiple(RunContext context, List<ParseResult> results) {
         if (results.size() == 1) return eval(context, results.get(0));
-
-        if (results.size() >= 2) {
-            ParseType type = results.get(0).getType();
-            if (type.equals(get("variable"))) {
-                ParseResult alteration = results.get(1);
-                if (alteration.typeOf(get("increment"))) {
-                    Variable var = context.getOrCreateVariable(results.get(0).getText(), () -> 0D);
-                    Object val = var.get();
-                    if (val instanceof Number) {
-                        var.set(((Number) val).doubleValue() + 1);
-                        return wrappedEvalMultiple(context, val, results, 2);
-                    }
-                }
-                if (alteration.typeOf(get("decrement"))) {
-                    Variable var = context.getOrCreateVariable(results.get(0).getText(), () -> 0D);
-                    Object val = var.get();
-                    if (val instanceof Number) {
-                        var.set(((Number) val).doubleValue() - 1);
-                        return wrappedEvalMultiple(context, val, results, 2);
-                    }
-                }
-                if (alteration.typeOf(get("square"))) {
-                    Variable var = context.getOrCreateVariable(results.get(0).getText(), () -> 0D);
-                    Object val = var.get();
-                    if (val instanceof Number) {
-                        double doubleVal = ((Number) val).doubleValue();
-                        var.set(doubleVal * doubleVal);
-                        return wrappedEvalMultiple(context, val, results, 2);
-                    } else if (val instanceof String) {
-                        String newVal = ((String) val).repeat(2);
-                        var.set(newVal);
-                        return wrappedEvalMultiple(context, val, results, 2);
-                    }
-                }
-            }
-            if (type.equals(get("increment"))) {
-                if (results.get(1).typeOf(get("variable"))) {
-                    Variable var = context.getOrCreateVariable(results.get(1).getText(), () -> 0);
-                    Object val = var.get();
-                    if (val instanceof Number) {
-                        double newVal = ((Number) val).doubleValue() + 1;
-                        var.set(newVal);
-                        return wrappedEvalMultiple(context, newVal, results, 2);
-                    }
-                }
-            }
-            if (type.equals(get("decrement"))) {
-                if (results.get(1).typeOf(get("variable"))) {
-                    Variable var = context.getOrCreateVariable(results.get(1).getText(), () -> 0);
-                    Object val = var.get();
-                    if (val instanceof Number) {
-                        double newVal = ((Number) val).doubleValue() - 1;
-                        var.set(newVal);
-                        return wrappedEvalMultiple(context, newVal, results, 2);
-                    }
-                }
-            }
-            if (type.equals(get("square"))) {
-                if (results.get(1).typeOf(get("variable"))) {
-                    Variable var = context.getOrCreateVariable(results.get(1).getText(), () -> 0);
-                    Object val = var.get();
-                    if (val instanceof Number) {
-                        double newVal = ((Number) val).doubleValue();
-                        newVal = newVal * newVal;
-                        var.set(newVal);
-                        return wrappedEvalMultiple(context, newVal, results, 2);
-                    } else if (val instanceof String) {
-                        String newVal = ((String) val).repeat(2);
-                        var.set(newVal);
-                        return wrappedEvalMultiple(context, newVal, results, 2);
-                    }
-                }
-            }
-            if (type.equals(get("method-name"))) {
-                if (results.get(1).typeOf(get("method-arguments"))) {
-                    Optional<Function> function = context.getFunction(results.get(0).getText());
-                    if (function.isEmpty()) {
-                        throw new RuntimeException("No function with name: \"" + results.get(0).getText() + "\" exists.");
-                    }
-                    return function.get().run(context, computeMethodParameters(results.get(1).getChildren(), results.get(0).getText(), context, function.get().getParams().size()).toArray());
-                } else {
-                    throw new RuntimeException("No arguments for method call to method named: " + results.get(0).getText());
-                }
-            }
-            if (type.equals(get("return"))) {
-                return new ReturnedObject(evalMultiple(context, results.subList(1, results.size())));
-            }
-            if (type.equals(get("minus"))) {
-                Object right = evalMultiple(context, results.subList(1, results.size()));
-                if (right instanceof Number) {
-                    return -(((Number) right).doubleValue());
-                }
-            }
-            if (type.equals(get("plus"))) {
-                Object right = evalMultiple(context, results.subList(1, results.size()));
-                if (right instanceof Number) {
-                    return Math.abs(((Number) right).doubleValue());
-                }
-            }
-            if (type.equals(get("negate"))) {
-                Object right = evalMultiple(context, results.subList(1, results.size()));
-                if (right instanceof Boolean) {
-                    return !(Boolean) right;
-                }
-            }
-        }
-
+        
         if (results.size() >= 3) {
             ParseType type = results.get(1).getType();
             Object left = UNSET;
             Object right = UNSET;
+            if (results.get(0).typeOf("new")) {
+                if (results.get(1).typeOf("method-name") && results.get(2).typeOf("method-arguments")) {
+                    String name = results.get(1).getText();
+                    Optional<Class<?>> referencedClass = context.findClass(name);
+                    if (referencedClass.isPresent()) {
+                        Object[] arguments = computeMethodParameters(results.get(2).getChildren(), "new " + name + "(...)", context).toArray();
+                        Optional<Constructor<Object>> constructor = ReflectionUtils.findConstructor(referencedClass.get(), arguments);
+                        if (constructor.isPresent()) {
+                            convertArgs(constructor.get().getParameters(), arguments);
+                            try {
+                                return wrappedEvalMultiple(context, constructor.get().newInstance(arguments), results, 3);
+                            } catch (InstantiationException | InvocationTargetException e) {
+                                throw new RuntimeException("Couldn't instantiate " + name + ".");
+                            } catch (IllegalAccessException e) {
+                                throw new RuntimeException("Couldn't access class " + referencedClass.get() + ".");
+                            }
+                        } else {
+                            throw new RuntimeException("No constructor for class \"" + referencedClass.get() + "\" with parameters that match " + Arrays.toString(arguments) + ".");
+                        }
+                    } else {
+                        throw new RuntimeException("Couldn't find class named: " + name);
+                    }
+                } else {
+                    throw new RuntimeException("Keyword 'new' isn't followed by a constructor call.");
+                }
+            }
             if (STRING_TYPES.contains(type)) {
                 left = eval(context, results.get(0));
                 right = evalMultiple(context, results.subList(2, results.size()));
@@ -481,7 +427,15 @@ public class Runner {
                     String methodName = member.get(0).getText();
                     List<Object> arguments = computeMethodParameters(member.get(1).getChildren(), methodName, context);
 
-                    Optional<Method> method = ReflectionUtils.findMethod(left, methodName, arguments.toArray());
+                    Optional<Method> method;
+                    if (left instanceof StaticClass) {
+                        method = ReflectionUtils.findMethod(
+                                Arrays.stream(((StaticClass) left).getRepresentedClass().getMethods()).filter(testMethod -> Modifier.isStatic(testMethod.getModifiers()))
+                                , methodName, arguments.toArray()
+                        );
+                    } else {
+                        method = ReflectionUtils.findMethod(left, methodName, arguments.toArray());
+                    }
                     if (method.isEmpty()) {
                         throw new RuntimeException("No method exists on object: \"" + left + "\" named: \"" + methodName + "\" which matches arguments: " + arguments);
                     }
@@ -505,23 +459,133 @@ public class Runner {
                 }
             }
         }
+        
+        if (results.size() >= 2) {
+            ParseType type = results.get(0).getType();
+            if (type.equals(get("variable"))) {
+                ParseResult alteration = results.get(1);
+                if (alteration.typeOf("increment")) {
+                    Variable var = context.getOrCreateVariable(results.get(0).getText(), () -> 0D);
+                    Object val = var.get();
+                    if (val instanceof Number) {
+                        var.set(((Number) val).doubleValue() + 1);
+                        return wrappedEvalMultiple(context, val, results, 2);
+                    }
+                }
+                if (alteration.typeOf("decrement")) {
+                    Variable var = context.getOrCreateVariable(results.get(0).getText(), () -> 0D);
+                    Object val = var.get();
+                    if (val instanceof Number) {
+                        var.set(((Number) val).doubleValue() - 1);
+                        return wrappedEvalMultiple(context, val, results, 2);
+                    }
+                }
+                if (alteration.typeOf("square")) {
+                    Variable var = context.getOrCreateVariable(results.get(0).getText(), () -> 0D);
+                    Object val = var.get();
+                    if (val instanceof Number) {
+                        double doubleVal = ((Number) val).doubleValue();
+                        var.set(doubleVal * doubleVal);
+                        return wrappedEvalMultiple(context, val, results, 2);
+                    } else if (val instanceof String) {
+                        String newVal = ((String) val).repeat(2);
+                        var.set(newVal);
+                        return wrappedEvalMultiple(context, val, results, 2);
+                    }
+                }
+            }
+            if (type.equals(get("increment"))) {
+                if (results.get(1).typeOf("variable")) {
+                    Variable var = context.getOrCreateVariable(results.get(1).getText(), () -> 0);
+                    Object val = var.get();
+                    if (val instanceof Number) {
+                        double newVal = ((Number) val).doubleValue() + 1;
+                        var.set(newVal);
+                        return wrappedEvalMultiple(context, newVal, results, 2);
+                    }
+                }
+            }
+            if (type.equals(get("decrement"))) {
+                if (results.get(1).typeOf("variable")) {
+                    Variable var = context.getOrCreateVariable(results.get(1).getText(), () -> 0);
+                    Object val = var.get();
+                    if (val instanceof Number) {
+                        double newVal = ((Number) val).doubleValue() - 1;
+                        var.set(newVal);
+                        return wrappedEvalMultiple(context, newVal, results, 2);
+                    }
+                }
+            }
+            if (type.equals(get("square"))) {
+                if (results.get(1).typeOf("variable")) {
+                    Variable var = context.getOrCreateVariable(results.get(1).getText(), () -> 0);
+                    Object val = var.get();
+                    if (val instanceof Number) {
+                        double newVal = ((Number) val).doubleValue();
+                        newVal = newVal * newVal;
+                        var.set(newVal);
+                        return wrappedEvalMultiple(context, newVal, results, 2);
+                    } else if (val instanceof String) {
+                        String newVal = ((String) val).repeat(2);
+                        var.set(newVal);
+                        return wrappedEvalMultiple(context, newVal, results, 2);
+                    }
+                }
+            }
+            if (type.equals(get("method-name"))) {
+                if (results.get(1).typeOf("method-arguments")) {
+                    Optional<Function> function = context.getFunction(results.get(0).getText());
+                    if (function.isEmpty()) {
+                        throw new RuntimeException("No function with name: \"" + results.get(0).getText() + "\" exists.");
+                    }
+                    return function.get().run(context, computeMethodParameters(results.get(1).getChildren(), results.get(0).getText(), context, function.get().getParams().size()).toArray());
+                } else {
+                    throw new RuntimeException("No arguments for method call to method named: " + results.get(0).getText());
+                }
+            }
+            if (type.equals(get("return"))) {
+                return new ReturnedObject(evalMultiple(context, results.subList(1, results.size())));
+            }
+            if (type.equals(get("minus"))) {
+                Object right = evalMultiple(context, results.subList(1, results.size()));
+                if (right instanceof Number) {
+                    return -(((Number) right).doubleValue());
+                }
+            }
+            if (type.equals(get("plus"))) {
+                Object right = evalMultiple(context, results.subList(1, results.size()));
+                if (right instanceof Number) {
+                    return Math.abs(((Number) right).doubleValue());
+                }
+            }
+            if (type.equals(get("negate"))) {
+                Object right = evalMultiple(context, results.subList(1, results.size()));
+                if (right instanceof Boolean) {
+                    return !(Boolean) right;
+                }
+            }
+        }
+
+
 
         throw new RuntimeException("Couldn't run: " + results);
     }
 
     private Object invoke(Method method, Object obj, Object[] args) throws InvocationTargetException, IllegalAccessException {
+        convertArgs(method.getParameters(), args);
+        return method.invoke(obj, args);
+    }
+    private void convertArgs(Parameter[] parameters, Object[] args) {
         int at = 0;
-        for (Parameter param : method.getParameters()) {
+        for (Parameter param : parameters) {
             if (param.isVarArgs()) {
                 Class<?> type = param.getType();
                 for (; at < args.length; at++) {
                     Object val = args[at];
                     if (val == null) continue;
-                    if (ReflectionUtils.isNum(type)) {
-                        if (ReflectionUtils.isNum(val.getClass())) {
-                            args[at] = ReflectionUtils.castNumber((Number) val, type);
-                            continue;
-                        }
+                    if (ReflectionUtils.isNum(type) && ReflectionUtils.isNum(val.getClass())) {
+                        args[at] = ReflectionUtils.castNumber((Number) val, type);
+                        continue;
                     }
                     if (!type.isAssignableFrom(val.getClass())) {
                         break;
@@ -537,7 +601,6 @@ public class Runner {
                 at++;
             }
         }
-        return method.invoke(obj, args);
     }
 
     private List<Object> computeMethodParameters(List<ParseResult> params, String methodName, RunContext context) {
@@ -547,7 +610,7 @@ public class Runner {
         List<List<ParseResult>> arguments = new ArrayList<>();
         List<ParseResult> buffer = new ArrayList<>();
         for (ParseResult result : params) {
-            if (result.typeOf(get("separator"))) {
+            if (result.typeOf("separator")) {
                 arguments.add(buffer);
                 buffer.clear();
             } else {

@@ -15,7 +15,7 @@ public class LineParser extends ParserBranch {
     private static final ParseType GROUPING = get("grouping");
 
     private static final List<ParseType> WRAP_SIDES_WITH_PARENS = Arrays.asList(get("equals"), get("not-equal"), get("plus"), get("minus"), get("times"), get("division"), get("modulo"), get("period"));
-    private static final List<ParseType> SEPARATORS = Arrays.asList(get("semicolon"), get("separator"), get("assignment"), get("return"), get("new"));
+    private static final List<ParseType> SEPARATORS = Arrays.asList(get("semicolon"), get("separator"), get("assignment"), get("return"));
 
     private final MultiLineParser multiLineParser;
 
@@ -65,7 +65,7 @@ public class LineParser extends ParserBranch {
                 },
                 new Literal(".", get("period")),
 
-                new Literal("return", get("return")),
+                new Literal("return", get("return")), new Literal("new", get("new")),
                 new Literal("true", get("true")), new Literal("false", get("false")),
 
                 new Literal("++", get("increment")), new Literal("--", get("decrement")), new Literal("**", get("square")),

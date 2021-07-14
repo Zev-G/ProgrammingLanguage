@@ -56,4 +56,8 @@ public final class ParsePosition {
         return lines[lineNum];
     }
 
+    public String toPosString() {
+        return "[" + (line + 1) + ":" + (pos + 1) + "]";
+    }
+
 }

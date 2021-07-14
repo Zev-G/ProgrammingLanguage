@@ -1,5 +1,7 @@
 package parse.example.reflect;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Executable;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.Arrays;
@@ -13,10 +15,22 @@ public final class ReflectionUtils {
         return findMethod(Arrays.stream(obj.getClass().getMethods()), name, arguments);
     }
     public static Optional<Method> findMethod(Stream<Method> methods, String name, Object[] arguments) {
-        Stream<Method> matchingName = methods.filter(method -> method.getName().equals(name));
+        return findExecutable(methods, name, arguments);
+    }
+    @SuppressWarnings("unchecked")
+    public static <T> Optional<Constructor<T>> findConstructor(Class<?> obj, Object[] arguments) {
+        return findExecutable(Arrays.stream((Constructor<T>[]) obj.getConstructors()), arguments);
+    }
+    public static <T> Optional<Constructor<T>> findConstructor(Stream<Constructor<T>> constructors, Object[] arguments) {
+        return findExecutable(constructors, arguments);
+    }
+    public static <T extends Executable> Optional<T> findExecutable(Stream<T> executables, String name, Object[] arguments) {
+        return findExecutable(executables.filter(executable -> executable.getName().equals(name)), arguments);
+    }
+    public static <T extends Executable> Optional<T> findExecutable(Stream<T> executables, Object[] arguments) {
         int length = arguments.length;
-        methods: for (Iterator<Method> it = matchingName.iterator(); it.hasNext(); ) {
-            Method method = it.next();
+        methods: for (Iterator<T> it = executables.iterator(); it.hasNext(); ) {
+            T method = it.next();
             Parameter[] params = method.getParameters();
             if (length == 0) {
                 if (params.length == 0) {
@@ -27,6 +41,9 @@ public final class ReflectionUtils {
             }
             int at = 0;
             for (Parameter parameter : params) {
+                if (at >= length) {
+                    continue methods;
+                }
                 if (parameter.isVarArgs()) {
                     for (; at < arguments.length && isAssignableFromOrNullOrBothNums(parameter.getType(), arguments[at]); at++);
                 } else {
@@ -37,8 +54,6 @@ public final class ReflectionUtils {
                 }
             }
             if (at != arguments.length) {
-                System.out.println("at = " + at);
-                System.out.println("arguments.length = " + arguments.length);
                 continue;
             }
             return Optional.of(method);

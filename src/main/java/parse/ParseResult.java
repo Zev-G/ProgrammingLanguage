@@ -27,6 +27,9 @@ public class ParseResult {
     public boolean typeOf(ParseType type) {
         return this.type.equals(type);
     }
+    public boolean typeOf(String type) {
+        return this.type.getName().equals(type);
+    }
 
     public String getText() {
         return text;
