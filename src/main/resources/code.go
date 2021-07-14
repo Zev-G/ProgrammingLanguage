@@ -1,1 +1,1 @@
-System.out.println("test".split("").length);
+System.out.println(Arrays.asList("123", "456").get(0));

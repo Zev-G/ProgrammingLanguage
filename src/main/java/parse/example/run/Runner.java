@@ -461,7 +461,7 @@ public class Runner {
                                 , methodName, arguments.toArray()
                         );
                     } else {
-                        method = ReflectionUtils.findMethod(left, methodName, arguments.toArray());
+                        method = ReflectionUtils.findAccessibleMethod(left, methodName, arguments.toArray());
                     }
                     if (method.isEmpty()) {
                         throw new RuntimeException("No method exists on object: \"" + left + "\" named: \"" + methodName + "\" which matches arguments: " + arguments);

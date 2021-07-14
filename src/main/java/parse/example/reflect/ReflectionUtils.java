@@ -17,6 +17,23 @@ public final class ReflectionUtils {
     public static Optional<Method> findMethod(Stream<Method> methods, String name, Object[] arguments) {
         return findExecutable(methods, name, arguments);
     }
+    public static Optional<Method> findAccessibleMethod(Object obj, String name, Object[] arguments) {
+        return findAccessibleMethod(obj, obj.getClass(), name, arguments);
+    }
+    public static Optional<Method> findAccessibleMethod(Object obj, Class<?> search, String name, Object[] arguments) {
+        if (search == null) return Optional.empty();
+        Optional<Method> result = findMethod(Arrays.stream(search.getMethods()), name, arguments);
+        if (result.isPresent()) {
+            Method method = result.get();
+            if (method.canAccess(obj)) {
+                return Optional.of(method);
+            } else {
+                return findAccessibleMethod(obj, search.getSuperclass(), name, arguments);
+            }
+        } else {
+            return Optional.empty();
+        }
+    }
     @SuppressWarnings("unchecked")
     public static <T> Optional<Constructor<T>> findConstructor(Class<?> obj, Object[] arguments) {
         return findExecutable(Arrays.stream((Constructor<T>[]) obj.getConstructors()), arguments);
