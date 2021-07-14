@@ -14,7 +14,7 @@ public class LineParser extends ParserBranch {
     public static final ParseType TYPE = get("line");
     private static final ParseType GROUPING = get("grouping");
 
-    private static final List<ParseType> WRAP_SIDES_WITH_PARENS = Arrays.asList(get("equals"), get("not-equal"), get("plus"), get("minus"), get("times"), get("division"), get("modulo"), get("period"));
+    private static final List<ParseType> WRAP_SIDES_WITH_PARENS = Arrays.asList(get("equals"), get("not-equal"), get("plus"), get("minus"), get("times"), get("division"), get("modulo")/*, get("period")*/);
     private static final List<ParseType> SEPARATORS = Arrays.asList(get("semicolon"), get("separator"), get("assignment"), get("return"));
 
     private final MultiLineParser multiLineParser;
@@ -205,6 +205,7 @@ public class LineParser extends ParserBranch {
         if (results.isEmpty()) {
             return Optional.empty();
         } else {
+
             // Map all variables in front of groupings to method-names.
             for (int i = 0, length = results.size() - 1; i < length; i++) {
                 ParseResult at = results.get(i);
@@ -215,6 +216,8 @@ public class LineParser extends ParserBranch {
                     i++;
                 }
             }
+
+            wrapWithGrouping(results).print();
 
             return Optional.of(new ParseResult(TYPE, text, group(results)));
         }

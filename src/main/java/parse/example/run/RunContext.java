@@ -9,7 +9,7 @@ public class RunContext {
 
     private final RunContext parent;
 
-    private final List<Import> imports = new ArrayList<>();
+    private final Set<Import> imports = new HashSet<>();
     private final Map<String, Variable> variables = new HashMap<>();
     private final Map<String, Function> functions = new HashMap<>();
 
@@ -69,7 +69,7 @@ public class RunContext {
         return Optional.empty();
     }
 
-    List<Import> getImports() {
+    Set<Import> getImports() {
         return imports;
     }
 

@@ -1,6 +1,7 @@
 package parse.example.run;
 
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.Optional;
 
 public class Import {
@@ -38,6 +39,21 @@ public class Import {
         String[] packagePath = Arrays.copyOfRange(parts, 0, parts.length - 1);
         String name = parts[parts.length - 1];
         return new Import(packagePath, name);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Import anImport = (Import) o;
+        return Arrays.equals(packagePath, anImport.packagePath) && Objects.equals(suffix, anImport.suffix);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = Objects.hash(suffix);
+        result = 31 * result + Arrays.hashCode(packagePath);
+        return result;
     }
 
     public Optional<Class<?>> findClass(String name) {

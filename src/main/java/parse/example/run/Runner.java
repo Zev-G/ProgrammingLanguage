@@ -60,6 +60,7 @@ public class Runner {
             }
         });
         global.getImports().add(Import.fromString("java.lang.*"));
+        global.getImports().add(Import.fromString("java.util.*"));
     }
 
     public Object run(ParseResult result) {
@@ -295,7 +296,7 @@ public class Runner {
                         Object[] arguments = computeMethodParameters(results.get(2).getChildren(), "new " + name + "(...)", context).toArray();
                         Optional<Constructor<Object>> constructor = ReflectionUtils.findConstructor(referencedClass.get(), arguments);
                         if (constructor.isPresent()) {
-                            convertArgs(constructor.get().getParameters(), arguments);
+                            arguments = convertArgs(constructor.get().getParameters(), arguments);
                             try {
                                 return wrappedEvalMultiple(context, constructor.get().newInstance(arguments), results, 3);
                             } catch (InstantiationException | InvocationTargetException e) {
@@ -369,7 +370,8 @@ public class Runner {
                         }
                     }
                 }
-                error(results);
+                System.err.println(results.stream().map(ParseResult::toPrettyString).collect(Collectors.joining("\n")));
+                throw new RuntimeException("Couldn't calculate " + results);
             }
             if (COMPARATORS.contains(type)) {
                 if (left == UNSET) {
@@ -421,8 +423,8 @@ public class Runner {
                 if (left == UNSET) {
                     left = eval(context, results.get(0));
                 }
-                List<ParseResult> member = collapseGrouping(results.get(2));
-                if (member.size() == 2) {
+                List<ParseResult> member = results.subList(2, results.size());
+                if (member.size() >= 2) {
                     // Method
                     String methodName = member.get(0).getText();
                     List<Object> arguments = computeMethodParameters(member.get(1).getChildren(), methodName, context);
@@ -440,9 +442,15 @@ public class Runner {
                         throw new RuntimeException("No method exists on object: \"" + left + "\" named: \"" + methodName + "\" which matches arguments: " + arguments);
                     }
                     try {
-                        return invoke(method.get(), left, arguments.toArray());
+                        if (Modifier.isStatic(method.get().getModifiers())) {
+                            left = null;
+                        }
+                        if (!method.get().canAccess(left)) {
+                            method.get().setAccessible(true);
+                        }
+                        return wrappedEvalMultiple(context, invoke(method.get(), left, arguments.toArray()), member, 2);
                     } catch (IllegalAccessException e) {
-                        throw new RuntimeException("Can't access method " + methodName + ".");
+                        throw new RuntimeException("Can't access method \"" + method.get().toGenericString() + "\".");
                     } catch (InvocationTargetException e) {
                         throw new RuntimeException("No method exists on object: \"" + left + "\" named: \"" + methodName + "\" which matches arguments: " + arguments);
                     }
@@ -572,35 +580,47 @@ public class Runner {
     }
 
     private Object invoke(Method method, Object obj, Object[] args) throws InvocationTargetException, IllegalAccessException {
-        convertArgs(method.getParameters(), args);
-        return method.invoke(obj, args);
+        return method.invoke(obj, convertArgs(method.getParameters(), args));
     }
-    private void convertArgs(Parameter[] parameters, Object[] args) {
+    private Object[] convertArgs(Parameter[] parameters, Object[] args) {
+        List<Object> newArgs = new ArrayList<>();
         int at = 0;
         for (Parameter param : parameters) {
             if (param.isVarArgs()) {
-                Class<?> type = param.getType();
+                Class<?> type = param.getType().getComponentType();
+                List<Object> objects = new ArrayList<>();
                 for (; at < args.length; at++) {
                     Object val = args[at];
-                    if (val == null) continue;
+                    if (val == null) {
+                        objects.add(null);
+                        continue;
+                    }
                     if (ReflectionUtils.isNum(type) && ReflectionUtils.isNum(val.getClass())) {
-                        args[at] = ReflectionUtils.castNumber((Number) val, type);
+                        objects.add(ReflectionUtils.castNumber((Number) val, type));
                         continue;
                     }
                     if (!type.isAssignableFrom(val.getClass())) {
                         break;
+                    } else {
+                        objects.add(val);
                     }
                 }
+                newArgs.add(objects.toArray((Object[]) Array.newInstance(type, 0)));
             } else {
                 if (args[at] != null) {
                     Class<?> type = param.getType();
                     if (ReflectionUtils.isNum(type) && ReflectionUtils.isNum(args[at].getClass())) {
-                        args[at] = ReflectionUtils.castNumber((Number) args[at], type);
+                        newArgs.add(ReflectionUtils.castNumber((Number) args[at], type));
+                    } else {
+                        newArgs.add(args[at]);
                     }
+                } else {
+                    newArgs.add(null);
                 }
                 at++;
             }
         }
+        return newArgs.toArray();
     }
 
     private List<Object> computeMethodParameters(List<ParseResult> params, String methodName, RunContext context) {
@@ -609,12 +629,12 @@ public class Runner {
     private List<Object> computeMethodParameters(List<ParseResult> params, String methodName, RunContext context, int expected) {
         List<List<ParseResult>> arguments = new ArrayList<>();
         List<ParseResult> buffer = new ArrayList<>();
-        for (ParseResult result : params) {
-            if (result.typeOf("separator")) {
-                arguments.add(buffer);
+        for (ParseResult param : params) {
+            if (param.typeOf("separator")) {
+                arguments.add(new ArrayList<>(buffer));
                 buffer.clear();
             } else {
-                buffer.add(result);
+                buffer.add(param);
             }
         }
         if (!buffer.isEmpty()) {
