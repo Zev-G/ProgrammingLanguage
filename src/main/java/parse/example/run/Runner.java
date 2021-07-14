@@ -587,6 +587,12 @@ public class Runner {
         int at = 0;
         for (Parameter param : parameters) {
             if (param.isVarArgs()) {
+                Object argAt = args[at];
+                if (argAt != null && param.getType().isAssignableFrom(argAt.getClass())) {
+                    newArgs.add(argAt);
+                    at++;
+                    continue;
+                }
                 Class<?> type = param.getType().getComponentType();
                 List<Object> objects = new ArrayList<>();
                 for (; at < args.length; at++) {

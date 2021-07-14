@@ -45,6 +45,11 @@ public final class ReflectionUtils {
                     continue methods;
                 }
                 if (parameter.isVarArgs()) {
+                    Object argAt = arguments[at];
+                    if (argAt != null && parameter.getType().isAssignableFrom(argAt.getClass())) {
+                        at++;
+                        continue;
+                    }
                     for (; at < length && isAssignableFromOrNullOrBothNums(parameter.getType().getComponentType(), arguments[at]); at++);
                 } else {
                     if (!isAssignableFromOrNullOrBothNums(parameter.getType(), arguments[at])) {
