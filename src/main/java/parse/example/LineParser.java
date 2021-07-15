@@ -14,8 +14,12 @@ public class LineParser extends ParserBranch {
     public static final ParseType TYPE = get("line");
     private static final ParseType GROUPING = get("grouping");
 
-    private static final List<ParseType> WRAP_SIDES_WITH_PARENS = Arrays.asList(get("equals"), get("not-equal"), get("plus"), get("minus"), get("times"), get("division"), get("modulo")/*, get("period")*/);
-    private static final List<ParseType> SEPARATORS = Arrays.asList(get("semicolon"), get("separator"), get("assignment"), get("return"));
+    public static final List<ParseType> WRAP_SIDES_WITH_PARENS = Arrays.asList(get("equals"), get("not-equal"), get("plus"), get("minus"), get("times"), get("division"), get("modulo")/*, get("period")*/);
+    public static final List<ParseType> NUMERIC_ASSIGNMENTS = Arrays.asList(get("plus-equals"), get("minus-equals"), get("times-equals"), get("division-equals"), get("modulo-equals"));
+    public static final List<ParseType> SEPARATORS = new ArrayList<>(Arrays.asList(get("semicolon"), get("separator"), get("assignment"), get("return")));
+    static {
+        SEPARATORS.addAll(NUMERIC_ASSIGNMENTS);
+    }
 
     private final MultiLineParser multiLineParser;
 
@@ -67,6 +71,8 @@ public class LineParser extends ParserBranch {
 
                 new Literal("return", get("return")), new Literal("new", get("new")),
                 new Literal("true", get("true")), new Literal("false", get("false")),
+
+                new Literal("+=", get("plus-equals")), new Literal("-=", get("minus-equals")), new Literal("*=", get("times-equals")), new Literal("/=", get("division-equals")),  new Literal("%=", get("modulo-equals")),
 
                 new Literal("++", get("increment")), new Literal("--", get("decrement")), new Literal("**", get("square")),
                 new Literal("+", get("plus")), new Literal("-", get("minus")), new Literal("*", get("times")), new Literal("/", get("division")),  new Literal("%", get("modulo")),
@@ -216,8 +222,6 @@ public class LineParser extends ParserBranch {
                     i++;
                 }
             }
-
-            wrapWithGrouping(results).print();
 
             return Optional.of(new ParseResult(TYPE, text, group(results)));
         }

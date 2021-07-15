@@ -5,6 +5,7 @@ import parse.ParsePosition;
 import parse.ParseResult;
 import parse.ParseType;
 import parse.example.ImportParser;
+import parse.example.LineParser;
 import parse.example.MultiLineParser;
 import parse.example.TypeRegistry;
 import parse.example.reflect.ReflectionUtils;
@@ -21,8 +22,12 @@ import static parse.example.TypeRegistry.get;
  * <ul>
  *     <li>(DONE) Modulo</li>
  *     <li>(DONE) While Loops</li>
- *     <li>Times equal (*=), divide equals (/=), etc.</li>
+ *     <li>(DONE) Times equal (*=), divide equals (/=), etc.</li>
  *     <li>Negations</li>
+ *     <li>Static imports for methods and fields.</li>
+ *     <li>Lambdas.</li>
+ *     <li>For each loops.</li>
+ *     <li>Support for arrays.</li>
  *     <li>(DONE) Methods of objects.</li>
  *     <li>(DONE) Fields of objects.</li>
  *     <li>(DONE) Accessing java classes.</li>
@@ -30,6 +35,11 @@ import static parse.example.TypeRegistry.get;
  * <h1>To be fixed:</h1>
  * <ul>
  *     <li>(DONE) Negative numbers broken again. Seems to be due to negative signs being WRAP_SIDES_WITH_PARENS in {@link parse.example.LineParser}</li>
+ * </ul>
+ * <h1>Other goals:</h1>
+ * <ul>
+ *     <li>Improve performance. Should be able to run a loop from 0 to 1,000,000 in under a second.</li>
+ *     <li>Better parsing errors.</li>
  * </ul>
  */
 public class Runner {
@@ -496,10 +506,43 @@ public class Runner {
             }
             if (results.get(0).getType().equals(get("variable"))) {
                 Variable var = context.getOrCreateVariable(results.get(0).getText());
-                if (results.get(1).getType().equals(get("assignment"))) {
+                if (results.get(1).typeOf("assignment")) {
                     Object val = evalMultiple(context, results.subList(2, results.size()));
                     var.set(val);
                     return val;
+                } else if (LineParser.NUMERIC_ASSIGNMENTS.contains(type)) {
+                    Object varVal = var.get();
+                    if (varVal == null) {
+                        varVal = 0;
+                    }
+                    if (!(varVal instanceof Number)) {
+                        throw new RunIssue("Can't perform \"" + results.get(1).getText() + "\" on variable \"" + results.get(0).getText() + "\" because its value isn't a number.");
+                    }
+                    if (right == UNSET) {
+                        right = evalMultiple(context, results.subList(2, results.size()));
+                    }
+                    if (!(right instanceof Number)) {
+                        throw new RunIssue("Can't perform \"" + results.get(1).getText() + "\" on variable \"" + results.get(0).getText() + "\" because value \"" + right + "\" isn't a number.");
+                    }
+                    double varAsNum = ((Number) varVal).doubleValue();
+                    double rightAsNum = ((Number) right).doubleValue();
+                    Object newVal;
+                    ParseResult typeHolder = results.get(1);
+                    if (typeHolder.typeOf("plus-equals")) {
+                        newVal = varAsNum + rightAsNum;
+                    } else if (typeHolder.typeOf("minus-equals")) {
+                        newVal = varAsNum - rightAsNum;
+                    } else if (typeHolder.typeOf("times-equals")) {
+                        newVal = varAsNum * rightAsNum;
+                    } else if (typeHolder.typeOf("divide-equals")) {
+                        newVal = varAsNum / rightAsNum;
+                    } else if (typeHolder.typeOf("modulo-equals")) {
+                        newVal = varAsNum  %rightAsNum;
+                    } else {
+                        throw new IllegalStateException();
+                    }
+                    var.set(newVal);
+                    return newVal;
                 }
             }
         }

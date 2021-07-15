@@ -5,8 +5,10 @@ import java.util.function.Supplier;
 
 public class RunContext {
 
+    public static final boolean TRACK_CHILDREN = false;
+
     private final RunContext parent;
-    private final List<RunContext> children = new ArrayList<>();
+    private final List<RunContext> children = TRACK_CHILDREN ? new ArrayList<>() : null;
 
     private final Set<Import> imports = new HashSet<>();
     private final Map<String, Variable> variables = new HashMap<>();
@@ -21,7 +23,9 @@ public class RunContext {
         this.parent = parent;
         if (parent != null) {
             this.imports.addAll(parent.getImports());
-            this.parent.children.add(this);
+            if (TRACK_CHILDREN) {
+                this.parent.children.add(this);
+            }
         }
     }
 

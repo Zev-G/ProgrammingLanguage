@@ -1,1 +1,4 @@
-System.out.println(Arrays.asList("123", "456").get(0));
+x = 10;
+x *= 100;
+
+println(x);
