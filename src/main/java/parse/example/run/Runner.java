@@ -36,6 +36,15 @@ public class Runner {
 
     private final RunContext global = new RunContext();
     private PrintStream out = System.out;
+    
+    private boolean trackEvaluating = false;
+    private boolean trackRunningLine = false;
+    
+    private boolean usingDelay = false;
+    private long delay = 0;
+
+    private Runnable currentLineInvalidated;
+    private ParseResult currentLine;
 
     public Runner() {
         global.registerFunction("print", new Function(Collections.singleton("text")) {
@@ -86,7 +95,7 @@ public class Runner {
     private Object run(RunContext context, ParseResult result) {
         // Check for illegal types.
         if (result.getType().equals(TypeRegistry.get("method-declaration"))) {
-            throw new RuntimeException("Can't register function from this point.");
+            throw new RunIssue("Can't register function from this point.");
         }
         // Check for ignored types.
         if (result.typeOf(ImportParser.TYPE)) {
@@ -126,10 +135,21 @@ public class Runner {
         }
         // Run a singular line.
         if (type == get("line")) {
+            if (trackRunningLine) {
+                currentLine = result;
+                currentLineInvalidated.run();
+            }
+            if (usingDelay && delay > 0) {
+                try {
+                    Thread.sleep(delay);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
             return evalMultiple(context, result.getChildren());
         }
         // Something has gone wrong if none of the previous checks have returned something.
-        throw new RuntimeException("Couldn't run: " + result);
+        throw new RunIssue("Couldn't run: " + result);
     }
     private void registerFunction(RunContext context, ParseResult declaration, ParseResult body) {
         String methodName = declaration.getChildren().get(0).getText();
@@ -138,7 +158,7 @@ public class Runner {
             @Override
             public Object run(RunContext context1, Object... vars) {
                 if (params.size() != vars.length) {
-                    throw new RuntimeException("Invalid number of parameters in method call to method: " + methodName);
+                    throw new RunIssue("Invalid number of parameters in method call to method: " + methodName);
                 }
                 RunContext functionContext = new RunContext(context);
                 for (int i = 0, paramsSize = params.size(); i < paramsSize; i++) {
@@ -153,14 +173,6 @@ public class Runner {
                 }
             }
         });
-    }
-
-    public void setOut(PrintStream out) {
-        this.out = out;
-    }
-
-    public PrintStream getOut() {
-        return out;
     }
 
     private Object runStatement(RunContext context, ParseResult header, ParseResult body) {
@@ -188,7 +200,7 @@ public class Runner {
                         return false;
                     }
                 } else {
-                    throw new RuntimeException("Couldn't evaluate: \"" + headerLine.getText().trim() + "\" as boolean.");
+                    throw new RunIssue("Couldn't evaluate: \"" + headerLine.getText().trim() + "\" as boolean.");
                 }
             }
             if (defining.typeOf("else")) {
@@ -201,7 +213,7 @@ public class Runner {
             }
             if (defining.typeOf("for")) {
                 if (headerLine.getChildren().size() != 2 || !headerLine.getChildren().get(1).typeOf("grouping")) {
-                    throw new RuntimeException("No parentheses used in for statement in: " + defining);
+                    throw new RunIssue("No parentheses used in for statement in: " + defining);
                 }
                 List<List<ParseResult>> separatedSections = new ArrayList<>();
                 List<ParseResult> buffer = new ArrayList<>();
@@ -227,7 +239,7 @@ public class Runner {
                     }
                     return last;
                 } else {
-                    throw new RuntimeException("Invalid inputs in for statement: " + header);
+                    throw new RunIssue("Invalid inputs in for statement: " + header);
                 }
             }
             if (defining.typeOf("while")) {
@@ -243,7 +255,7 @@ public class Runner {
             }
 
         }
-        throw new RuntimeException("Couldn't run statement: " + header + " " + body);
+        throw new RunIssue("Couldn't run statement: " + header + " " + body);
     }
 
     private Object eval(RunContext context, ParseResult result) {
@@ -301,18 +313,18 @@ public class Runner {
                             try {
                                 return wrappedEvalMultiple(context, constructor.get().newInstance(arguments), results, 3);
                             } catch (InstantiationException | InvocationTargetException e) {
-                                throw new RuntimeException("Couldn't instantiate " + name + ".");
+                                throw new RunIssue("Couldn't instantiate " + name + ".");
                             } catch (IllegalAccessException e) {
-                                throw new RuntimeException("Couldn't access class " + referencedClass.get() + ".");
+                                throw new RunIssue("Couldn't access class " + referencedClass.get() + ".");
                             }
                         } else {
-                            throw new RuntimeException("No constructor for class \"" + referencedClass.get() + "\" with parameters that match " + Arrays.toString(arguments) + ".");
+                            throw new RunIssue("No constructor for class \"" + referencedClass.get() + "\" with parameters that match " + Arrays.toString(arguments) + ".");
                         }
                     } else {
-                        throw new RuntimeException("Couldn't find class named: " + name);
+                        throw new RunIssue("Couldn't find class named: " + name);
                     }
                 } else {
-                    throw new RuntimeException("Keyword 'new' isn't followed by a constructor call.");
+                    throw new RunIssue("Keyword 'new' isn't followed by a constructor call.");
                 }
             }
             if (STRING_TYPES.contains(type)) {
@@ -372,7 +384,7 @@ public class Runner {
                     }
                 }
                 System.err.println(results.stream().map(ParseResult::toPrettyString).collect(Collectors.joining("\n")));
-                throw new RuntimeException("Couldn't calculate " + results);
+                throw new RunIssue("Couldn't calculate " + results);
             }
             if (COMPARATORS.contains(type)) {
                 if (left == UNSET) {
@@ -445,10 +457,10 @@ public class Runner {
                             }
                             return wrappedEvalMultiple(context, field.get(left), member, 1);
                         } catch (IllegalAccessException e) {
-                            throw new RuntimeException("Can't access field \"" + field + "\"");
+                            throw new RunIssue("Can't access field \"" + field + "\"");
                         }
                     } catch (NoSuchFieldException e) {
-                        throw new RuntimeException("No field named \"" + fieldName + "\" on " + left + ".");
+                        throw new RunIssue("No field named \"" + fieldName + "\" on " + left + ".");
                     }
                 } else if (member.size() >= 2) {
                     // Method
@@ -465,7 +477,7 @@ public class Runner {
                         method = ReflectionUtils.findAccessibleMethod(left, methodName, arguments.toArray());
                     }
                     if (method.isEmpty()) {
-                        throw new RuntimeException("No method exists on object: \"" + left + "\" named: \"" + methodName + "\" which matches arguments: " + arguments);
+                        throw new RunIssue("No method exists on object: \"" + left + "\" named: \"" + methodName + "\" which matches arguments: " + arguments);
                     }
                     try {
                         if (Modifier.isStatic(method.get().getModifiers())) {
@@ -476,9 +488,9 @@ public class Runner {
                         }
                         return wrappedEvalMultiple(context, invoke(method.get(), left, arguments.toArray()), member, 2);
                     } catch (IllegalAccessException e) {
-                        throw new RuntimeException("Can't access method \"" + method.get().toGenericString() + "\".");
+                        throw new RunIssue("Can't access method \"" + method.get().toGenericString() + "\".");
                     } catch (InvocationTargetException e) {
-                        throw new RuntimeException("No method exists on object: \"" + left + "\" named: \"" + methodName + "\" which matches arguments: " + arguments);
+                        throw new RunIssue("No method exists on object: \"" + left + "\" named: \"" + methodName + "\" which matches arguments: " + arguments);
                     }
                 }
             }
@@ -568,11 +580,11 @@ public class Runner {
                 if (results.get(1).typeOf("method-arguments")) {
                     Optional<Function> function = context.getFunction(results.get(0).getText());
                     if (function.isEmpty()) {
-                        throw new RuntimeException("No function with name: \"" + results.get(0).getText() + "\" exists.");
+                        throw new RunIssue("No function with name: \"" + results.get(0).getText() + "\" exists.");
                     }
                     return function.get().run(context, computeMethodParameters(results.get(1).getChildren(), results.get(0).getText(), context, function.get().getParams().size()).toArray());
                 } else {
-                    throw new RuntimeException("No arguments for method call to method named: " + results.get(0).getText());
+                    throw new RunIssue("No arguments for method call to method named: " + results.get(0).getText());
                 }
             }
             if (type.equals(get("return"))) {
@@ -600,7 +612,7 @@ public class Runner {
 
 
 
-        throw new RuntimeException("Couldn't run: " + results);
+        throw new RunIssue("Couldn't run: " + results);
     }
 
     private Object invoke(Method method, Object obj, Object[] args) throws InvocationTargetException, IllegalAccessException {
@@ -671,7 +683,7 @@ public class Runner {
             arguments.add(buffer);
         }
         if (expected > 0 && arguments.size() != expected) {
-            throw new RuntimeException("Invalid number of parameters in call to function named: " + methodName + ". Found " + arguments.size() + " expected " + expected);
+            throw new RunIssue("Invalid number of parameters in call to function named: " + methodName + ". Found " + arguments.size() + " expected " + expected);
         }
         return arguments.stream().map(results -> evalMultiple(context, results)).collect(Collectors.toList());
     }
@@ -736,7 +748,63 @@ public class Runner {
         error(Collections.singletonList(result));
     }
     private void error(List<ParseResult> at) {
-        throw new RuntimeException("Failed at: " + at);
+        throw new RunIssue("Failed at: " + at);
+    }
+
+    public void setOut(PrintStream out) {
+        this.out = out;
+    }
+
+    public PrintStream getOut() {
+        return out;
+    }
+
+    public boolean isTrackEvaluating() {
+        return trackEvaluating;
+    }
+
+    public void setTrackEvaluating(boolean trackEvaluating) {
+        this.trackEvaluating = trackEvaluating;
+    }
+
+    public boolean isTrackRunningLine() {
+        return trackRunningLine;
+    }
+
+    public void setTrackRunningLine(boolean trackRunningLine) {
+        this.trackRunningLine = trackRunningLine;
+    }
+
+    public boolean isUsingDelay() {
+        return usingDelay;
+    }
+
+    public void setUsingDelay(boolean usingDelay) {
+        this.usingDelay = usingDelay;
+    }
+
+    public long getDelay() {
+        return delay;
+    }
+
+    public void setDelay(long delay) {
+        this.delay = delay;
+    }
+
+    public Runnable getCurrentLineInvalidated() {
+        return currentLineInvalidated;
+    }
+
+    public void setCurrentLineInvalidated(Runnable currentLineInvalidated) {
+        this.currentLineInvalidated = currentLineInvalidated;
+    }
+
+    public RunContext getGlobal() {
+        return global;
+    }
+
+    public ParseResult getCurrentLine() {
+        return currentLine;
     }
 
 }

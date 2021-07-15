@@ -1,13 +1,12 @@
 package parse.example.run;
 
-import parse.ParseResult;
-
 import java.util.*;
 import java.util.function.Supplier;
 
 public class RunContext {
 
     private final RunContext parent;
+    private final List<RunContext> children = new ArrayList<>();
 
     private final Set<Import> imports = new HashSet<>();
     private final Map<String, Variable> variables = new HashMap<>();
@@ -22,6 +21,7 @@ public class RunContext {
         this.parent = parent;
         if (parent != null) {
             this.imports.addAll(parent.getImports());
+            this.parent.children.add(this);
         }
     }
 
@@ -83,6 +83,10 @@ public class RunContext {
 
     public Map<String, Function> getFunctions() {
         return functions;
+    }
+
+    public List<RunContext> getChildren() {
+        return children;
     }
 
     public void registerFunction(String name, Function function) {
