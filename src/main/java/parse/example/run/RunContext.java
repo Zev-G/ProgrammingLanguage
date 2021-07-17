@@ -29,15 +29,22 @@ public class RunContext {
         }
     }
 
-    public Optional<Variable> getVariable(String text) {
+    private String lastSearchedKey;
+    private Variable lastSearched;
+    public Variable getVariable(String text) {
         Variable var = variables.get(text);
+        if (lastSearchedKey != null && lastSearchedKey.equals(text)) {
+            return lastSearched;
+        }
         if (var == null) {
             if (parent == null) {
-                return Optional.empty();
+                return null;
             }
             return parent.getVariable(text);
         }
-        return Optional.of(var);
+        lastSearchedKey = text;
+        lastSearched = var;
+        return var;
     }
     public Variable getOrCreateVariable(String text) {
         return getOrCreateVariable(text, () -> null);
@@ -46,8 +53,8 @@ public class RunContext {
         return getOrCreateVariable(text, () -> initialValue);
     }
     public Variable getOrCreateVariable(String text, Supplier<Object> initialValSupplier) {
-        Optional<Variable> varCheck = getVariable(text);
-        if (varCheck.isPresent()) return varCheck.get();
+        Variable varCheck = getVariable(text);
+        if (varCheck != null) return varCheck;
         Variable variable = Variable.of(initialValSupplier.get());
         variables.put(text, variable);
         return variable;

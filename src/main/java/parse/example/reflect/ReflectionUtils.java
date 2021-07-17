@@ -11,6 +11,142 @@ import java.util.stream.Stream;
 
 public final class ReflectionUtils {
 
+    public static Iterable<?> primitiveArrayToIterable(byte[] iterator) {
+        return (Iterable<Object>) () -> new Iterator<>() {
+
+            int at = 0;
+
+            @Override
+            public boolean hasNext() {
+                return at < iterator.length;
+            }
+
+            @Override
+            public Object next() {
+                return iterator[at++];
+            }
+        };
+    }
+
+    public static Iterable<?> primitiveArrayToIterable(short[] iterator) {
+        return (Iterable<Object>) () -> new Iterator<>() {
+
+            int at = 0;
+
+            @Override
+            public boolean hasNext() {
+                return at < iterator.length;
+            }
+
+            @Override
+            public Object next() {
+                return iterator[at++];
+            }
+        };
+    }
+
+    public static Iterable<?> primitiveArrayToIterable(int[] iterator) {
+        return (Iterable<Object>) () -> new Iterator<>() {
+
+            int at = 0;
+
+            @Override
+            public boolean hasNext() {
+                return at < iterator.length;
+            }
+
+            @Override
+            public Object next() {
+                return iterator[at++];
+            }
+        };
+    }
+
+    public static Iterable<?> primitiveArrayToIterable(long[] iterator) {
+        return (Iterable<Object>) () -> new Iterator<>() {
+
+            int at = 0;
+
+            @Override
+            public boolean hasNext() {
+                return at < iterator.length;
+            }
+
+            @Override
+            public Object next() {
+                return iterator[at++];
+            }
+        };
+    }
+
+    public static Iterable<?> primitiveArrayToIterable(float[] iterator) {
+        return (Iterable<Object>) () -> new Iterator<>() {
+
+            int at = 0;
+
+            @Override
+            public boolean hasNext() {
+                return at < iterator.length;
+            }
+
+            @Override
+            public Object next() {
+                return iterator[at++];
+            }
+        };
+    }
+
+    public static Iterable<?> primitiveArrayToIterable(double[] iterator) {
+        return (Iterable<Object>) () -> new Iterator<>() {
+
+            int at = 0;
+
+            @Override
+            public boolean hasNext() {
+                return at < iterator.length;
+            }
+
+            @Override
+            public Object next() {
+                return iterator[at++];
+            }
+        };
+    }
+
+    public static Iterable<?> primitiveArrayToIterable(char[] iterator) {
+        return (Iterable<Object>) () -> new Iterator<>() {
+
+            int at = 0;
+
+            @Override
+            public boolean hasNext() {
+                return at < iterator.length;
+            }
+
+            @Override
+            public Object next() {
+                return iterator[at++];
+            }
+        };
+    }
+
+    public static Iterable<?> primitiveArrayToIterable(boolean[] iterator) {
+        return (Iterable<Object>) () -> new Iterator<>() {
+
+            int at = 0;
+
+            @Override
+            public boolean hasNext() {
+                return at < iterator.length;
+            }
+
+            @Override
+            public Object next() {
+                return iterator[at++];
+            }
+        };
+    }
+
     public static Optional<Method> findMethod(Object obj, String name, Object[] arguments) {
         return findMethod(Arrays.stream(obj.getClass().getMethods()), name, arguments);
     }

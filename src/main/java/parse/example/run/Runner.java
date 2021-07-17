@@ -14,6 +14,7 @@ import java.io.PrintStream;
 import java.lang.reflect.*;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static parse.example.TypeRegistry.get;
 
@@ -23,10 +24,9 @@ import static parse.example.TypeRegistry.get;
  *     <li>(DONE) Modulo</li>
  *     <li>(DONE) While Loops</li>
  *     <li>(DONE) Times equal (*=), divide equals (/=), etc.</li>
- *     <li>Negations</li>
  *     <li>Static imports for methods and fields.</li>
  *     <li>Lambdas.</li>
- *     <li>For each loops.</li>
+ *     <li>(DONE) For each loops.</li>
  *     <li>Support for arrays.</li>
  *     <li>(DONE) Methods of objects.</li>
  *     <li>(DONE) Fields of objects.</li>
@@ -77,6 +77,17 @@ public class Runner {
                 String text = String.valueOf(params[0]);
                 Optional<ParseResult> parse = new MultiLineParser().parse(text, new ParsePosition(text, 0));
                 return parse.map(result -> Runner.this.run(context, result)).orElse(null);
+            }
+        });
+        global.registerFunction("range", new Function(List.of("begin", "end")) {
+            @Override
+            public Object run(RunContext context, Object... params) {
+                Object begin = params[0];
+                Object end = params[1];
+                if (!(begin instanceof Number) || !(end instanceof Number)) {
+                    throw new IllegalArgumentException("Beginning and end of range must be integers.");
+                }
+                return IntStream.range(((Number) begin).intValue(), ((Number) end).intValue()).toArray();
             }
         });
         global.getImports().add(Import.fromString("java.lang.*"));
@@ -225,9 +236,57 @@ public class Runner {
                 if (headerLine.getChildren().size() != 2 || !headerLine.getChildren().get(1).typeOf("grouping")) {
                     throw new RunIssue("No parentheses used in for statement in: " + defining);
                 }
+                List<ParseResult> internalChildren = headerLine.getChildren().get(1).getChildren();
+                if (internalChildren.size() >= 3 && internalChildren.get(1).typeOf("for-each")) {
+                    // Validate variable.
+                    if (!internalChildren.get(0).typeOf("variable")) {
+                        throw new RunIssue("First item in for-each loop isn't a variable.");
+                    }
+
+                    Variable var = newContext.getOrCreateVariable(internalChildren.get(0).getText());
+                    Object iterator = evalMultiple(newContext, internalChildren.subList(2, internalChildren.size()));
+                    if (iterator == null) {
+                        throw new RunIssue("Can't iterate over null");
+                    }
+                    if (!(iterator instanceof Iterable) && !iterator.getClass().isArray()) {
+                        throw new RunIssue("Tried to start for-each loop with non-iterable.");
+                    } else if (iterator.getClass().isArray()) {
+                        if (iterator instanceof Object[]) {
+                            iterator = Arrays.asList((Object[]) iterator);
+                        } else if (iterator instanceof byte[]) {
+                            iterator = ReflectionUtils.primitiveArrayToIterable((byte[]) iterator);
+                        } else if (iterator instanceof short[]) {
+                            iterator = ReflectionUtils.primitiveArrayToIterable((short[]) iterator);
+                        } else if (iterator instanceof int[]) {
+                            iterator = ReflectionUtils.primitiveArrayToIterable((int[]) iterator);
+                        } else if (iterator instanceof long[]) {
+                            iterator = ReflectionUtils.primitiveArrayToIterable((long[]) iterator);
+                        } else if (iterator instanceof float[]) {
+                            iterator = ReflectionUtils.primitiveArrayToIterable((float[]) iterator);
+                        } else if (iterator instanceof double[]) {
+                            iterator = ReflectionUtils.primitiveArrayToIterable((double[]) iterator);
+                        } else if (iterator instanceof char[]) {
+                            iterator = ReflectionUtils.primitiveArrayToIterable((char[]) iterator);
+                        } else if (iterator instanceof boolean[]) {
+                            iterator = ReflectionUtils.primitiveArrayToIterable((boolean[]) iterator);
+                        } else {
+                            throw new RunIssue("The impossible has happened.");
+                        }
+                    }
+                    Object last = null;
+                    for (Object obj : (Iterable<?>) iterator) {
+                        var.set(obj);
+                        last = run(new RunContext(newContext), body);
+                        if (last instanceof ReturnedObject) {
+                            break;
+                        }
+                    }
+                    return last;
+                }
+
                 List<List<ParseResult>> separatedSections = new ArrayList<>();
                 List<ParseResult> buffer = new ArrayList<>();
-                for (ParseResult result : headerLine.getChildren().get(1).getChildren()) {
+                for (ParseResult result : internalChildren) {
                     if (result.typeOf("semicolon")) {
                         separatedSections.add(new ArrayList<>(buffer));
                         buffer.clear();
@@ -244,8 +303,11 @@ public class Runner {
                     List<ParseResult> runAfter = separatedSections.get(2);
 
                     Object last = null;
-                    for (evalMultiple(newContext, runFirst); (Boolean) evalMultiple(newContext, checkEachTime); evalMultiple(newContext, runAfter)) {
+                    for (evalMultiple(newContext, runFirst); evalAsBoolean(newContext, checkEachTime); evalMultiple(newContext, runAfter)) {
                         last = run(new RunContext(newContext), body);
+                        if (last instanceof ReturnedObject) {
+                            break;
+                        }
                     }
                     return last;
                 } else {
@@ -268,6 +330,13 @@ public class Runner {
         throw new RunIssue("Couldn't run statement: " + header + " " + body);
     }
 
+    private boolean evalAsBoolean(RunContext newContext, List<ParseResult> checkEachTime) {
+        if (checkEachTime.isEmpty()) return true;
+        Object result = evalMultiple(newContext, checkEachTime);
+        if (result instanceof Boolean) return (boolean) result;
+        throw new RunIssue("Can't use " + result + " as boolean.");
+    }
+
     private Object eval(RunContext context, ParseResult result) {
         ParseType type = result.getType();
         if (result instanceof ParseResultWrapper) {
@@ -277,12 +346,7 @@ public class Runner {
             return evalMultiple(context, result.getChildren());
         }
         if (type.equals(get("variable"))) {
-            Optional<Class<?>> asClass = context.findClass(result.getText());
-            if (asClass.isPresent()) {
-                return StaticClass.forClass(asClass.get());
-            } else {
-                return context.getOrCreateVariable(result.getText()).get();
-            }
+            return context.getOrCreateVariable(result.getText()).get();
         }
         if (type.equals(get("number"))) {
             return Double.parseDouble(result.getText());
@@ -311,6 +375,78 @@ public class Runner {
             ParseType type = results.get(1).getType();
             Object left = UNSET;
             Object right = UNSET;
+            if (results.get(1).typeOf("period")) {
+                ParseResult zero = results.get(0);
+                if (zero.typeOf("variable") || zero.typeOf("for-each") || zero.typeOf("elif")) {
+                    Optional<Class<?>> classLookupResult = context.findClass(results.get(0).getText());
+                    if (classLookupResult.isPresent()) {
+                        left = StaticClass.forClass(classLookupResult.get());
+                    }
+                }
+                if (left == UNSET) {
+                    left = eval(context, zero);
+                }
+                List<ParseResult> member = results.subList(2, results.size());
+                if (member.get(0).typeOf("for-each") || member.get(0).typeOf("elif")) {
+                    member.set(0, new ParseResult(get("variable"), member.get(0).getText()));
+                }
+                if (member.size() >= 1 && member.get(0).typeOf("variable")) {
+                    // Field
+                    String fieldName = member.get(0).getText();
+                    // Handle length of arrays.
+                    if (fieldName.equals("length") && left instanceof Object[]) {
+                        return wrappedEvalMultiple(context, ((Object[]) left).length, member, 1);
+                    }
+                    try {
+                        Field field;
+                        if (left instanceof StaticClass) {
+                            field = ((StaticClass) left).getRepresentedClass().getField(fieldName);
+                        } else {
+                            field = left.getClass().getField(fieldName);
+                        }
+                        try {
+                            if (Modifier.isStatic(field.getModifiers())) {
+                                left = null;
+                            }
+                            return wrappedEvalMultiple(context, field.get(left), member, 1);
+                        } catch (IllegalAccessException e) {
+                            throw new RunIssue("Can't access field \"" + field + "\"");
+                        }
+                    } catch (NoSuchFieldException e) {
+                        throw new RunIssue("No field named \"" + fieldName + "\" on " + left + ".");
+                    }
+                } else if (member.size() >= 2) {
+                    // Method
+                    String methodName = member.get(0).getText();
+                    List<Object> arguments = computeMethodParameters(member.get(1).getChildren(), methodName, context);
+
+                    Optional<Method> method;
+                    if (left instanceof StaticClass) {
+                        method = ReflectionUtils.findMethod(
+                                Arrays.stream(((StaticClass) left).getRepresentedClass().getMethods()).filter(testMethod -> Modifier.isStatic(testMethod.getModifiers()))
+                                , methodName, arguments.toArray()
+                        );
+                    } else {
+                        method = ReflectionUtils.findAccessibleMethod(left, methodName, arguments.toArray());
+                    }
+                    if (method.isEmpty()) {
+                        throw new RunIssue("No method exists on object: \"" + left + "\" named: \"" + methodName + "\" which matches arguments: " + arguments);
+                    }
+                    try {
+                        if (Modifier.isStatic(method.get().getModifiers())) {
+                            left = null;
+                        }
+                        if (!method.get().canAccess(left)) {
+                            method.get().setAccessible(true);
+                        }
+                        return wrappedEvalMultiple(context, invoke(method.get(), left, arguments.toArray()), member, 2);
+                    } catch (IllegalAccessException e) {
+                        throw new RunIssue("Can't access method \"" + method.get().toGenericString() + "\".");
+                    } catch (InvocationTargetException e) {
+                        throw new RunIssue("No method exists on object: \"" + left + "\" named: \"" + methodName + "\" which matches arguments: " + arguments);
+                    }
+                }
+            }
             if (results.get(0).typeOf("new")) {
                 if (results.get(1).typeOf("method-name") && results.get(2).typeOf("method-arguments")) {
                     String name = results.get(1).getText();
@@ -338,7 +474,9 @@ public class Runner {
                 }
             }
             if (STRING_TYPES.contains(type)) {
-                left = eval(context, results.get(0));
+                if (left == UNSET) {
+                    left = eval(context, results.get(0));
+                }
                 right = evalMultiple(context, results.subList(2, results.size()));
                 if (left instanceof String || right instanceof String) {
                     if (type.equals(get("plus"))) {
@@ -442,68 +580,6 @@ public class Runner {
                     }
                 }
             }
-            if (type.equals(get("period"))) {
-                if (left == UNSET) {
-                    left = eval(context, results.get(0));
-                }
-                List<ParseResult> member = results.subList(2, results.size());
-                if (member.size() >= 1 && member.get(0).typeOf("variable")) {
-                    // Field
-                    String fieldName = member.get(0).getText();
-                    // Handle length of arrays.
-                    if (fieldName.equals("length") && left instanceof Object[]) {
-                        return wrappedEvalMultiple(context, ((Object[]) left).length, member, 1);
-                    }
-                    try {
-                        Field field;
-                        if (left instanceof StaticClass) {
-                            field = ((StaticClass) left).getRepresentedClass().getField(fieldName);
-                        } else {
-                            field = left.getClass().getField(fieldName);
-                        }
-                        try {
-                            if (Modifier.isStatic(field.getModifiers())) {
-                                left = null;
-                            }
-                            return wrappedEvalMultiple(context, field.get(left), member, 1);
-                        } catch (IllegalAccessException e) {
-                            throw new RunIssue("Can't access field \"" + field + "\"");
-                        }
-                    } catch (NoSuchFieldException e) {
-                        throw new RunIssue("No field named \"" + fieldName + "\" on " + left + ".");
-                    }
-                } else if (member.size() >= 2) {
-                    // Method
-                    String methodName = member.get(0).getText();
-                    List<Object> arguments = computeMethodParameters(member.get(1).getChildren(), methodName, context);
-
-                    Optional<Method> method;
-                    if (left instanceof StaticClass) {
-                        method = ReflectionUtils.findMethod(
-                                Arrays.stream(((StaticClass) left).getRepresentedClass().getMethods()).filter(testMethod -> Modifier.isStatic(testMethod.getModifiers()))
-                                , methodName, arguments.toArray()
-                        );
-                    } else {
-                        method = ReflectionUtils.findAccessibleMethod(left, methodName, arguments.toArray());
-                    }
-                    if (method.isEmpty()) {
-                        throw new RunIssue("No method exists on object: \"" + left + "\" named: \"" + methodName + "\" which matches arguments: " + arguments);
-                    }
-                    try {
-                        if (Modifier.isStatic(method.get().getModifiers())) {
-                            left = null;
-                        }
-                        if (!method.get().canAccess(left)) {
-                            method.get().setAccessible(true);
-                        }
-                        return wrappedEvalMultiple(context, invoke(method.get(), left, arguments.toArray()), member, 2);
-                    } catch (IllegalAccessException e) {
-                        throw new RunIssue("Can't access method \"" + method.get().toGenericString() + "\".");
-                    } catch (InvocationTargetException e) {
-                        throw new RunIssue("No method exists on object: \"" + left + "\" named: \"" + methodName + "\" which matches arguments: " + arguments);
-                    }
-                }
-            }
             if (results.get(0).getType().equals(get("variable"))) {
                 Variable var = context.getOrCreateVariable(results.get(0).getText());
                 if (results.get(1).typeOf("assignment")) {
@@ -548,8 +624,8 @@ public class Runner {
         }
         
         if (results.size() >= 2) {
-            ParseType type = results.get(0).getType();
-            if (type.equals(get("variable"))) {
+            ParseResult resultZero = results.get(0);
+            if (resultZero.typeOf("variable")) {
                 ParseResult alteration = results.get(1);
                 if (alteration.typeOf("increment")) {
                     Variable var = context.getOrCreateVariable(results.get(0).getText(), () -> 0D);
@@ -581,7 +657,7 @@ public class Runner {
                     }
                 }
             }
-            if (type.equals(get("increment"))) {
+            if (resultZero.typeOf("increment")) {
                 if (results.get(1).typeOf("variable")) {
                     Variable var = context.getOrCreateVariable(results.get(1).getText(), () -> 0);
                     Object val = var.get();
@@ -592,7 +668,7 @@ public class Runner {
                     }
                 }
             }
-            if (type.equals(get("decrement"))) {
+            if (resultZero.typeOf("decrement")) {
                 if (results.get(1).typeOf("variable")) {
                     Variable var = context.getOrCreateVariable(results.get(1).getText(), () -> 0);
                     Object val = var.get();
@@ -603,7 +679,7 @@ public class Runner {
                     }
                 }
             }
-            if (type.equals(get("square"))) {
+            if (resultZero.typeOf("square")) {
                 if (results.get(1).typeOf("variable")) {
                     Variable var = context.getOrCreateVariable(results.get(1).getText(), () -> 0);
                     Object val = var.get();
@@ -619,7 +695,7 @@ public class Runner {
                     }
                 }
             }
-            if (type.equals(get("method-name"))) {
+            if (resultZero.typeOf("method-name")) {
                 if (results.get(1).typeOf("method-arguments")) {
                     Optional<Function> function = context.getFunction(results.get(0).getText());
                     if (function.isEmpty()) {
@@ -630,30 +706,28 @@ public class Runner {
                     throw new RunIssue("No arguments for method call to method named: " + results.get(0).getText());
                 }
             }
-            if (type.equals(get("return"))) {
+            if (resultZero.typeOf("return")) {
                 return new ReturnedObject(evalMultiple(context, results.subList(1, results.size())));
             }
-            if (type.equals(get("minus"))) {
+            if (resultZero.typeOf("minus")) {
                 Object right = evalMultiple(context, results.subList(1, results.size()));
                 if (right instanceof Number) {
                     return -(((Number) right).doubleValue());
                 }
             }
-            if (type.equals(get("plus"))) {
+            if (resultZero.typeOf("plus")) {
                 Object right = evalMultiple(context, results.subList(1, results.size()));
                 if (right instanceof Number) {
                     return Math.abs(((Number) right).doubleValue());
                 }
             }
-            if (type.equals(get("negate"))) {
+            if (resultZero.typeOf("negate")) {
                 Object right = evalMultiple(context, results.subList(1, results.size()));
                 if (right instanceof Boolean) {
                     return !(Boolean) right;
                 }
             }
         }
-
-
 
         throw new RunIssue("Couldn't run: " + results);
     }
