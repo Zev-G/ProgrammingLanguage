@@ -1,10 +1,3 @@
-
-list = ["hi", "there", "how", "are", "you"];
-
-for (val : list) {
-    println("val = " + val);
-}
-
 // import java.nio.file.*;
 // import java.util.stream.*;
 //

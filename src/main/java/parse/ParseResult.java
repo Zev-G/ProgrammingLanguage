@@ -7,7 +7,7 @@ public class ParseResult {
     private final ParseType type;
     private final String text;
 
-    private final List<ParseResult> children = new ArrayList<>();
+    private final ParseResults children = new ParseResults();
 
     public ParseResult(ParseType type, String text) {
         this(type, text, Collections.emptyList());
@@ -35,7 +35,7 @@ public class ParseResult {
         return text;
     }
 
-    public List<ParseResult> getChildren() {
+    public ParseResults getChildren() {
         return children;
     }
 
