@@ -70,6 +70,7 @@ public class LineParser extends ParserBranch {
                 new Literal(".", get("period")),
 
                 new Literal(" : ", get("for-each")), new Literal(" in ", get("for-each")),
+                new Literal(" typeof ", get("instanceof")), new Literal(" instanceof ", get("instanceof")),
 
                 new Literal("return", get("return")), new Literal("new", get("new")),
                 new Literal("true", get("true")), new Literal("false", get("false")),
