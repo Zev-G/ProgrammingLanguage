@@ -807,7 +807,12 @@ public class Runner {
                 }
             }
             if (resultZero.typeOf("return")) {
-                return new ReturnedObject(evalMultiple(context, results.subList(1)));
+                ParseResults subList = results.subList(1);
+                if (subList.isEmpty()) {
+                    return new ReturnedObject(null);
+                } else {
+                    return new ReturnedObject(evalMultiple(context, subList));
+                }
             }
             if (resultZero.typeOf("minus")) {
                 Object right = evalMultiple(context, results.subList(1));
