@@ -2,6 +2,7 @@ package parse.example.reflect;
 
 import java.lang.reflect.*;
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public final class ReflectionUtils {
@@ -186,7 +187,7 @@ public final class ReflectionUtils {
             E method = it.next();
             Parameter[] params = method.getParameters();
             if (length == 0) {
-                if (params.length == 0) {
+                if (params.length == 0 || (params.length == 1 && params[0].isVarArgs())) {
                     return Optional.of(method);
                 } else {
                     continue;
@@ -195,6 +196,9 @@ public final class ReflectionUtils {
             int at = 0;
             for (Parameter parameter : params) {
                 if (at >= length) {
+                    if (parameter.isVarArgs()) {
+                        continue;
+                    }
                     continue methods;
                 }
                 if (parameter.isVarArgs()) {
@@ -203,6 +207,7 @@ public final class ReflectionUtils {
                         at++;
                         continue;
                     }
+                    at++;
                     for (; at < length && isAssignableFromOrNullOrBothNums(parameter.getType().getComponentType(), arguments[at]); at++);
                 } else {
                     if (!isAssignableFromOrNullOrBothNums(parameter.getType(), arguments[at])) {
@@ -227,6 +232,10 @@ public final class ReflectionUtils {
         int at = 0;
         for (Parameter param : parameters) {
             if (param.isVarArgs()) {
+                if (at == args.length) {
+                    newArgs.add(Array.newInstance(param.getType().getComponentType(), 0));
+                    break;
+                }
                 Object argAt = args[at];
                 if (argAt != null && param.getType().isAssignableFrom(argAt.getClass())) {
                     newArgs.add(argAt);

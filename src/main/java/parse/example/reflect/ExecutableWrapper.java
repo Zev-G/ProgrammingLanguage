@@ -25,6 +25,11 @@ public interface ExecutableWrapper<T> {
             public T getValue() {
                 return executable;
             }
+
+            @Override
+            public String toString() {
+                return executable.toString();
+            }
         };
     }
 

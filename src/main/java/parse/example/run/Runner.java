@@ -405,7 +405,7 @@ public class Runner {
             if (results.get(1).typeOf("period")) {
                 ParseResult zero = results.get(0);
                 if (zero.typeOf("variable") || zero.typeOf("for-each") || zero.typeOf("elif")) {
-                    Optional<Class<?>> classLookupResult = context.findClass(results.get(0).getText());
+                    Optional<Class<?>> classLookupResult = context.findClass(zero.getText());
                     if (classLookupResult.isPresent()) {
                         left = StaticClass.forClass(classLookupResult.get());
                     }
@@ -467,20 +467,23 @@ public class Runner {
                         method = ReflectionUtils.findAccessibleMethod(left, methodName, arguments.toArray());
                     }
                     if (method.isEmpty()) {
-                        throw new RunIssue("No method exists on object: \"" + left + "\" named: \"" + methodName + "\" which matches arguments: " + arguments);
+                        throw new RunIssue("No method exists on object: \"" + left + "\" (" + zero + ") named: \"" + methodName + "\" which matches arguments: " + arguments);
                     }
                     try {
+                        Object use;
                         if (Modifier.isStatic(method.get().getModifiers())) {
-                            left = null;
+                            use = null;
+                        } else {
+                            use = left;
                         }
-                        if (!method.get().canAccess(left)) {
+                        if (!method.get().canAccess(use)) {
                             method.get().setAccessible(true);
                         }
-                        return wrappedEvalMultiple(context, ReflectionUtils.invoke(method.get(), left, arguments.toArray()), member, 2);
+                        return wrappedEvalMultiple(context, ReflectionUtils.invoke(method.get(), use, arguments.toArray()), member, 2);
                     } catch (IllegalAccessException e) {
                         throw new RunIssue("Can't access method \"" + method.get().toGenericString() + "\".");
                     } catch (InvocationTargetException e) {
-                        throw new RunIssue("No method exists on object: \"" + left + "\" named: \"" + methodName + "\" which matches arguments: " + arguments);
+                        throw new RunIssue("No method exists on object: \"" + left + "\" (" + zero + ") named: \"" + methodName + "\" which matches arguments: " + arguments);
                     }
                 }
             }

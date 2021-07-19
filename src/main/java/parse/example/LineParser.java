@@ -92,6 +92,7 @@ public class LineParser extends ParserBranch {
     public Optional<ParseResult> parse(String text, ParsePosition state) {
         List<ParseResult> results = new ArrayList<>();
         int withinParens = 0;
+        int withinSquareBrackets = 0;
         StringBuilder buffer = new StringBuilder();
         boolean inString = false;
         boolean inChar = false;
@@ -107,13 +108,13 @@ public class LineParser extends ParserBranch {
             if (currentChar == '"') {
                 if (!inString) {
                     inString = true;
-                    if (withinParens == 0) {
+                    if (withinParens == 0 && withinSquareBrackets == 0) {
                         buffer = new StringBuilder();
                         continue;
                     }
                 } else if (!escaped) {
                     inString = false;
-                    if (withinParens == 0) {
+                    if (withinParens == 0 && withinSquareBrackets == 0) {
                         results.add(new ParseResult(get("string"), buffer.toString()));
                         buffer = new StringBuilder();
                         continue;
@@ -125,13 +126,13 @@ public class LineParser extends ParserBranch {
             if (currentChar == '\'') {
                 if (!inChar) {
                     inChar = true;
-                    if (withinParens == 0) {
+                    if (withinParens == 0 && withinSquareBrackets == 0) {
                         buffer = new StringBuilder();
                         continue;
                     }
                 } else if (!escaped) {
                     inChar = false;
-                    if (withinParens == 0) {
+                    if (withinParens == 0 && withinSquareBrackets == 0) {
                         results.add(new ParseResult(get("char"), buffer.toString()));
                         continue;
                     }
@@ -144,13 +145,13 @@ public class LineParser extends ParserBranch {
                 // Handle character escaping.
                 if (currentChar == '\\' && !escaped) {
                     escaped = true;
-                    if (withinParens != 0) {
+                    if (withinParens != 0 || withinSquareBrackets != 0) {
                         buffer.append(currentChar);
                     }
                     continue;
                 }
 
-                if (withinParens == 0) {
+                if (withinParens == 0 && withinSquareBrackets == 0) {
 
                     // Handle certain special cases.
                     if (escaped) {
@@ -173,13 +174,31 @@ public class LineParser extends ParserBranch {
                 continue;
             }
 
+            // Handle open and closing square brackets.
+            if (currentChar == '[') {
+                if (withinSquareBrackets++ == 0) {
+                    continue;
+                }
+            } else if (currentChar == ']') {
+                if (--withinSquareBrackets == 0) {
+                    Optional<ParseResult> result = parse(buffer.toString(), position);
+                    if (result.isPresent()) {
+                        results.add(new ParseResult(get("square-bracket-grouping"), buffer.toString(), result.get().getChildren()));
+                    } else {
+                        results.add(new ParseResult(get("square-bracket-grouping"), buffer.toString()));
+                    }
+                    buffer = new StringBuilder();
+                    continue;
+                }
+            }
+
+            // Handle open and closing parentheses
             if (currentChar == '(') {
                 if (withinParens++ == 0) {
                     continue;
                 }
             } else if (currentChar == ')') {
-                withinParens--;
-                if (withinParens == 0) {
+                if (--withinParens == 0) {
                     Optional<ParseResult> result = parse(buffer.toString(), position);
                     if (result.isPresent()) {
                         results.add(new ParseResult(get("grouping"), buffer.toString(), result.get().getChildren()));
@@ -191,7 +210,7 @@ public class LineParser extends ParserBranch {
                 }
             }
 
-            if (withinParens > 0) {
+            if (withinParens > 0 || withinSquareBrackets > 0) {
                 buffer.append(currentChar);
                 continue;
             }
