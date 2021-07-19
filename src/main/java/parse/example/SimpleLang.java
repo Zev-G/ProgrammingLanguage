@@ -5,7 +5,6 @@ import parse.ParseResult;
 import parse.example.run.RunContext;
 import parse.example.run.Runner;
 
-import java.util.Arrays;
 import java.util.Optional;
 
 public class SimpleLang {

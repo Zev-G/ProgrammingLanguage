@@ -77,7 +77,7 @@ public class MultiLineParser extends RedirectParserBranch {
             final List<ToBeParsed> portions = new ArrayList<>();
 
             @SuppressWarnings("ConstantConditions")
-            ToBeParsed[] parse(String text, ParsePosition state) {
+            ToBeParsed[] parse(String text) {
                 this.text = text;
 
                 char[] characters = text.toCharArray();
@@ -91,6 +91,11 @@ public class MultiLineParser extends RedirectParserBranch {
                     // Check if entering a single-line comment.
                     if (afterInclusive.startsWith("//") && !inBlockade()) {
                         inSingleLineComment = true;
+                    }
+
+                    // Check if entering a multi-line comment.
+                    if (afterInclusive.startsWith("/*") && !inBlockade()) {
+                        inMultiLineComment = true;
                     }
 
                     // Check if on a new line a single-line comment.
@@ -111,6 +116,13 @@ public class MultiLineParser extends RedirectParserBranch {
                     } else {
                         // Increment position on line.
                         onLine++;
+                    }
+
+                    // Check if leaving a multi-line comment.
+                    if (afterInclusive.startsWith("*/") && !inText()) {
+                        inMultiLineComment = false;
+                        at++;
+                        continue;
                     }
 
                     // Skip if still in comment.
@@ -227,14 +239,18 @@ public class MultiLineParser extends RedirectParserBranch {
             }
 
             private boolean inBlockade() {
-                return inComment() || inString || inChar;
+                return inComment() || inText();
+            }
+
+            private boolean inText() {
+                return inString || inChar;
             }
 
             private boolean inComment() {
                 return inSingleLineComment || inMultiLineComment;
             }
 
-        }.parse(text, state);
+        }.parse(text);
     }
 
 }
