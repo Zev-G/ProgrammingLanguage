@@ -1,12 +1,7 @@
 package parse.example.reflect;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Executable;
-import java.lang.reflect.Method;
-import java.lang.reflect.Parameter;
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.Optional;
+import java.lang.reflect.*;
+import java.util.*;
 import java.util.stream.Stream;
 
 public final class ReflectionUtils {
@@ -182,9 +177,13 @@ public final class ReflectionUtils {
         return findExecutable(executables.filter(executable -> executable.getName().equals(name)), arguments);
     }
     public static <T extends Executable> Optional<T> findExecutable(Stream<T> executables, Object[] arguments) {
+        return findExecutableInternal(executables.map(ExecutableWrapper::fromExecutable), arguments).map(ExecutableWrapper::getValue);
+    }
+
+    public static <T, E extends ExecutableWrapper<T>> Optional<E> findExecutableInternal(Stream<E> executables, Object[] arguments) {
         int length = arguments.length;
-        methods: for (Iterator<T> it = executables.iterator(); it.hasNext(); ) {
-            T method = it.next();
+        methods: for (Iterator<E> it = executables.iterator(); it.hasNext(); ) {
+            E method = it.next();
             Parameter[] params = method.getParameters();
             if (length == 0) {
                 if (params.length == 0) {
@@ -218,6 +217,56 @@ public final class ReflectionUtils {
             return Optional.of(method);
         }
         return Optional.empty();
+    }
+
+    public static Object invoke(Method method, Object obj, Object[] args) throws InvocationTargetException, IllegalAccessException {
+        return method.invoke(obj, convertArgs(method.getParameters(), args));
+    }
+    public static Object[] convertArgs(Parameter[] parameters, Object[] args) {
+        List<Object> newArgs = new ArrayList<>();
+        int at = 0;
+        for (Parameter param : parameters) {
+            if (param.isVarArgs()) {
+                Object argAt = args[at];
+                if (argAt != null && param.getType().isAssignableFrom(argAt.getClass())) {
+                    newArgs.add(argAt);
+                    at++;
+                    continue;
+                }
+                Class<?> type = param.getType().getComponentType();
+                List<Object> objects = new ArrayList<>();
+                for (; at < args.length; at++) {
+                    Object val = args[at];
+                    if (val == null) {
+                        objects.add(null);
+                        continue;
+                    }
+                    if (ReflectionUtils.isNum(type) && ReflectionUtils.isNum(val.getClass())) {
+                        objects.add(ReflectionUtils.castNumber((Number) val, type));
+                        continue;
+                    }
+                    if (!type.isAssignableFrom(val.getClass())) {
+                        break;
+                    } else {
+                        objects.add(val);
+                    }
+                }
+                newArgs.add(objects.toArray((Object[]) Array.newInstance(type, 0)));
+            } else {
+                if (args[at] != null) {
+                    Class<?> type = param.getType();
+                    if (ReflectionUtils.isNum(type) && ReflectionUtils.isNum(args[at].getClass())) {
+                        newArgs.add(ReflectionUtils.castNumber((Number) args[at], type));
+                    } else {
+                        newArgs.add(args[at]);
+                    }
+                } else {
+                    newArgs.add(null);
+                }
+                at++;
+            }
+        }
+        return newArgs.toArray();
     }
 
     public static boolean isAssignableFromOrNullOrBothNums(Class<?> aClass, Object check) {

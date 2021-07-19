@@ -8,7 +8,10 @@ import parse.example.ImportParser;
 import parse.example.LineParser;
 import parse.example.MultiLineParser;
 import parse.example.TypeRegistry;
+import parse.example.reflect.ObjectsRunnableMethod;
 import parse.example.reflect.ReflectionUtils;
+import parse.example.reflect.RunnableMethod;
+import parse.example.reflect.StaticRunnableMethod;
 
 import java.io.PrintStream;
 import java.lang.reflect.*;
@@ -88,6 +91,30 @@ public class Runner {
                     throw new IllegalArgumentException("Beginning and end of range must be integers.");
                 }
                 return IntStream.range(((Number) begin).intValue(), ((Number) end).intValue()).toArray();
+            }
+        });
+        global.registerFunction("registerInstanceMethodsOf", new Function(Collections.singleton("object")) {
+            @Override
+            public Object run(RunContext context, Object... params) {
+                Object obj = params[0];
+                for (Method method : obj.getClass().getMethods()) {
+                    if (!Modifier.isStatic(method.getModifiers())) {
+                        context.getStaticMethods().add(new ObjectsRunnableMethod(method, obj));
+                    }
+                }
+                return null;
+            }
+        });
+        global.registerFunction("registerStaticMethodsOf", new Function(Collections.singleton("object")) {
+            @Override
+            public Object run(RunContext context, Object... params) {
+                Object obj = params[0];
+                for (Method method : (obj instanceof Class<?> ? (Class<?>) obj : obj.getClass()).getMethods()) {
+                    if (Modifier.isStatic(method.getModifiers())) {
+                        context.getStaticMethods().add(new ObjectsRunnableMethod(method, obj));
+                    }
+                }
+                return null;
             }
         });
         global.getImports().add(Import.fromString("java.lang.*"));
@@ -390,12 +417,23 @@ public class Runner {
                 if (member.get(0).typeOf("for-each") || member.get(0).typeOf("elif")) {
                     member.set(0, new ParseResult(get("variable"), member.get(0).getText()));
                 }
-                if (member.size() >= 1 && member.get(0).typeOf("variable")) {
-                    // Field
+                if (member.size() >= 1 && member.get(0).typeOf("variable")) { // Field
                     String fieldName = member.get(0).getText();
                     // Handle length of arrays.
                     if (fieldName.equals("length") && left instanceof Object[]) {
                         return wrappedEvalMultiple(context, ((Object[]) left).length, member, 1);
+                    }
+                    // Handle "System.class"
+                    if (fieldName.equals("class")) {
+                        if (left instanceof StaticClass) {
+                            return wrappedEvalMultiple(context, ((StaticClass) left).getRepresentedClass(), member, 1);
+                        } else if (left instanceof Class<?>) {
+                            return wrappedEvalMultiple(context, left, member, 1);
+                        } else if (left != null) {
+                            return wrappedEvalMultiple(context, left.getClass(), member, 1);
+                        } else {
+                            return null;
+                        }
                     }
                     try {
                         Field field;
@@ -415,8 +453,7 @@ public class Runner {
                     } catch (NoSuchFieldException e) {
                         throw new RunIssue("No field named \"" + fieldName + "\" on " + left + ".");
                     }
-                } else if (member.size() >= 2) {
-                    // Method
+                } else if (member.size() >= 2) { // Method
                     String methodName = member.get(0).getText();
                     List<Object> arguments = computeMethodParameters(member.get(1).getChildren(), methodName, context);
 
@@ -439,7 +476,7 @@ public class Runner {
                         if (!method.get().canAccess(left)) {
                             method.get().setAccessible(true);
                         }
-                        return wrappedEvalMultiple(context, invoke(method.get(), left, arguments.toArray()), member, 2);
+                        return wrappedEvalMultiple(context, ReflectionUtils.invoke(method.get(), left, arguments.toArray()), member, 2);
                     } catch (IllegalAccessException e) {
                         throw new RunIssue("Can't access method \"" + method.get().toGenericString() + "\".");
                     } catch (InvocationTargetException e) {
@@ -455,7 +492,7 @@ public class Runner {
                         Object[] arguments = computeMethodParameters(results.get(2).getChildren(), "new " + name + "(...)", context).toArray();
                         Optional<Constructor<Object>> constructor = ReflectionUtils.findConstructor(referencedClass.get(), arguments);
                         if (constructor.isPresent()) {
-                            arguments = convertArgs(constructor.get().getParameters(), arguments);
+                            arguments = ReflectionUtils.convertArgs(constructor.get().getParameters(), arguments);
                             try {
                                 return wrappedEvalMultiple(context, constructor.get().newInstance(arguments), results, 3);
                             } catch (InstantiationException | InvocationTargetException e) {
@@ -697,8 +734,25 @@ public class Runner {
             }
             if (resultZero.typeOf("method-name")) {
                 if (results.get(1).typeOf("method-arguments")) {
-                    Optional<Function> function = context.getFunction(results.get(0).getText());
+                    String name = results.get(0).getText();
+                    Optional<Function> function = context.getFunction(name);
                     if (function.isEmpty()) {
+                        if (!context.isJavaMethodsEmpty()) {
+                            List<Object> params = computeMethodParameters(results.get(1).getChildren(), name, context);
+                            Optional<RunnableMethod> result = ReflectionUtils.findExecutableInternal(
+                                    context.getStaticMethods().stream().filter(runnableMethod -> runnableMethod.getName().equals(name)),
+                                    params.toArray()
+                            );
+                            if (result.isPresent()) {
+                                try {
+                                    return result.get().run(params.toArray());
+                                } catch (InvocationTargetException e) {
+                                    throw new RunIssue("No method exists named: \"" + name + "\" which matches arguments: " + params);
+                                } catch (IllegalAccessException e) {
+                                    throw new RunIssue("Can't access method \"" + result.get().getMethod().toGenericString() + "\".");
+                                }
+                            }
+                        }
                         throw new RunIssue("No function with name: \"" + results.get(0).getText() + "\" exists.");
                     }
                     return function.get().run(context, computeMethodParameters(results.get(1).getChildren(), results.get(0).getText(), context, function.get().getParams().size()).toArray());
@@ -730,56 +784,6 @@ public class Runner {
         }
 
         throw new RunIssue("Couldn't run: " + results);
-    }
-
-    private Object invoke(Method method, Object obj, Object[] args) throws InvocationTargetException, IllegalAccessException {
-        return method.invoke(obj, convertArgs(method.getParameters(), args));
-    }
-    private Object[] convertArgs(Parameter[] parameters, Object[] args) {
-        List<Object> newArgs = new ArrayList<>();
-        int at = 0;
-        for (Parameter param : parameters) {
-            if (param.isVarArgs()) {
-                Object argAt = args[at];
-                if (argAt != null && param.getType().isAssignableFrom(argAt.getClass())) {
-                    newArgs.add(argAt);
-                    at++;
-                    continue;
-                }
-                Class<?> type = param.getType().getComponentType();
-                List<Object> objects = new ArrayList<>();
-                for (; at < args.length; at++) {
-                    Object val = args[at];
-                    if (val == null) {
-                        objects.add(null);
-                        continue;
-                    }
-                    if (ReflectionUtils.isNum(type) && ReflectionUtils.isNum(val.getClass())) {
-                        objects.add(ReflectionUtils.castNumber((Number) val, type));
-                        continue;
-                    }
-                    if (!type.isAssignableFrom(val.getClass())) {
-                        break;
-                    } else {
-                        objects.add(val);
-                    }
-                }
-                newArgs.add(objects.toArray((Object[]) Array.newInstance(type, 0)));
-            } else {
-                if (args[at] != null) {
-                    Class<?> type = param.getType();
-                    if (ReflectionUtils.isNum(type) && ReflectionUtils.isNum(args[at].getClass())) {
-                        newArgs.add(ReflectionUtils.castNumber((Number) args[at], type));
-                    } else {
-                        newArgs.add(args[at]);
-                    }
-                } else {
-                    newArgs.add(null);
-                }
-                at++;
-            }
-        }
-        return newArgs.toArray();
     }
 
     private List<Object> computeMethodParameters(List<ParseResult> params, String methodName, RunContext context) {

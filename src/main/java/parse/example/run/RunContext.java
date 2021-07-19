@@ -1,7 +1,11 @@
 package parse.example.run;
 
+import parse.example.reflect.RunnableMethod;
+
+import java.lang.reflect.Method;
 import java.util.*;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 public class RunContext {
 
@@ -13,6 +17,7 @@ public class RunContext {
     private final Set<Import> imports = new HashSet<>();
     private final Map<String, Variable> variables = new HashMap<>();
     private final Map<String, Function> functions = new HashMap<>();
+    private List<RunnableMethod> staticMethods;
 
     private boolean readyForElse = false;
 
@@ -23,6 +28,9 @@ public class RunContext {
         this.parent = parent;
         if (parent != null) {
             this.imports.addAll(parent.getImports());
+            if (!parent.isJavaMethodsEmpty()) {
+                getStaticMethods().addAll(parent.getStaticMethods());
+            }
             if (TRACK_CHILDREN) {
                 this.parent.children.add(this);
             }
@@ -98,6 +106,17 @@ public class RunContext {
 
     public List<RunContext> getChildren() {
         return children;
+    }
+
+    public List<RunnableMethod> getStaticMethods() {
+        if (staticMethods == null) {
+            staticMethods = new ArrayList<>();
+        }
+        return staticMethods;
+    }
+
+    public boolean isJavaMethodsEmpty() {
+        return staticMethods == null || staticMethods.isEmpty();
     }
 
     public void registerFunction(String name, Function function) {
