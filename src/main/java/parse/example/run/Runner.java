@@ -420,8 +420,8 @@ public class Runner {
                 if (member.size() >= 1 && member.get(0).typeOf("variable")) { // Field
                     String fieldName = member.get(0).getText();
                     // Handle length of arrays.
-                    if (fieldName.equals("length") && left instanceof Object[]) {
-                        return wrappedEvalMultiple(context, ((Object[]) left).length, member, 1);
+                    if (fieldName.equals("length") && ReflectionUtils.isArray(left)) {
+                        return wrappedEvalMultiple(context, ReflectionUtils.length(left), member, 1);
                     }
                     // Handle "System.class"
                     if (fieldName.equals("class")) {

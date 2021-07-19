@@ -296,4 +296,29 @@ public final class ReflectionUtils {
         return Number.class.isAssignableFrom(type) || type == int.class || type == double.class || type == long.class || type == byte.class || type == short.class || type == float.class;
     }
 
+    public static boolean isArray(Object obj) {
+        return
+            obj instanceof Object[] ||
+            obj instanceof byte[] ||
+            obj instanceof short[] ||
+            obj instanceof int[] ||
+            obj instanceof long[] ||
+            obj instanceof float[] ||
+            obj instanceof double[] ||
+            obj instanceof char[] ||
+            obj instanceof boolean[];
+    }
+    public static int length(Object obj) {
+        return
+            obj instanceof Object[] ? ((Object[]) obj).length :
+            obj instanceof byte[] ? ((byte[]) obj).length :
+            obj instanceof short[] ? ((short[]) obj).length :
+            obj instanceof int[] ? ((int[]) obj).length :
+            obj instanceof long[] ? ((long[]) obj).length :
+            obj instanceof float[] ? ((float[]) obj).length :
+            obj instanceof double[] ? ((double[]) obj).length :
+            obj instanceof char[] ? ((char[]) obj).length :
+            obj instanceof boolean[] ? ((boolean[]) obj).length : -1;
+    }
+
 }
