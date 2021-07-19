@@ -123,7 +123,7 @@ public class LineParser extends ParserBranch {
             }
 
             // Handle chars.
-            if (currentChar == '\'') {
+            if (currentChar == '\'' && !inString) {
                 if (!inChar) {
                     inChar = true;
                     if (withinParens == 0 && withinSquareBrackets == 0) {
@@ -226,7 +226,7 @@ public class LineParser extends ParserBranch {
         }
 
         if (inString || inChar) {
-            throw new RuntimeException("Text wasn't closed at pos: " + state);
+            throw new RuntimeException("Text wasn't closed at pos: " + state.toPosString());
         }
 
         if (results.isEmpty()) {

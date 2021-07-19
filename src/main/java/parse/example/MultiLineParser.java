@@ -146,7 +146,7 @@ public class MultiLineParser extends RedirectParserBranch {
                     }
 
                     // Handle chars.
-                    if (currentChar == '\'') {
+                    if (currentChar == '\'' && !inString) {
                         if (!inChar) {
                             inChar = true;
                         } else if (!escaped) {

@@ -161,7 +161,16 @@ public final class ReflectionUtils {
             if (method.canAccess(obj)) {
                 return Optional.of(method);
             } else {
-                return findAccessibleMethod(obj, search.getSuperclass(), name, arguments);
+                Optional<Method> superClassResult = findAccessibleMethod(obj, search.getSuperclass(), name, arguments);
+                if (superClassResult.isPresent()) {
+                    return findAccessibleMethod(obj, search.getSuperclass(), name, arguments);
+                } else {
+                    for (Class<?> implementedInterface : search.getInterfaces()) {
+                        Optional<Method> interfaceResult = findAccessibleMethod(obj, implementedInterface, name, arguments);
+                        if (interfaceResult.isPresent()) return interfaceResult;
+                    }
+                    return Optional.empty();
+                }
             }
         } else {
             return Optional.empty();

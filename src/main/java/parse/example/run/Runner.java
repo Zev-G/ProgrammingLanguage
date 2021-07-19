@@ -264,14 +264,32 @@ public class Runner {
                     throw new RunIssue("No parentheses used in for statement in: " + defining);
                 }
                 List<ParseResult> internalChildren = headerLine.getChildren().get(1).getChildren();
-                if (internalChildren.size() >= 3 && internalChildren.get(1).typeOf("for-each")) {
+                if (
+                        internalChildren.size() >= 3 &&
+                        (internalChildren.get(1).typeOf("for-each") ||
+                                (internalChildren.size() >= 4 && internalChildren.get(1).typeOf("separator") && internalChildren.get(2).typeOf("variable") && internalChildren.get(3).typeOf("for-each")))
+                ) {
+
+                    Variable indexVar = null;
+                    Variable var;
+                    Object iterator;
+
                     // Validate variable.
                     if (!internalChildren.get(0).typeOf("variable")) {
                         throw new RunIssue("First item in for-each loop isn't a variable.");
                     }
 
-                    Variable var = newContext.getOrCreateVariable(internalChildren.get(0).getText());
-                    Object iterator = evalMultiple(newContext, internalChildren.subList(2, internalChildren.size()));
+                    // Check for iterator
+                    if (internalChildren.size() >= 5 && internalChildren.get(1).typeOf("separator") && internalChildren.get(2).typeOf("variable")) {
+                        indexVar = newContext.getOrCreateVariable(internalChildren.get(2).getText());
+
+                        iterator = evalMultiple(newContext, internalChildren.subList(4, internalChildren.size()));
+                    } else {
+                        iterator = evalMultiple(newContext, internalChildren.subList(2, internalChildren.size()));
+                    }
+                    // Create main variable
+                    var = newContext.getOrCreateVariable(internalChildren.get(0).getText());
+
                     if (iterator == null) {
                         throw new RunIssue("Can't iterate over null");
                     }
@@ -301,7 +319,12 @@ public class Runner {
                         }
                     }
                     Object last = null;
+                    int i = 0;
                     for (Object obj : (Iterable<?>) iterator) {
+                        if (indexVar != null) {
+                            indexVar.set(i);
+                            i++;
+                        }
                         var.set(obj);
                         last = run(new RunContext(newContext), body);
                         if (last instanceof ReturnedObject) {
@@ -369,22 +392,30 @@ public class Runner {
         if (result instanceof ParseResultWrapper) {
             return ((ParseResultWrapper) result).getValue();
         }
-        if (type.equals(get("grouping"))) {
+        if (result.typeOf("square-bracket-grouping")) {
+            if (result.getChildren().isEmpty()) {
+                return new ArrayList<>();
+            } else {
+                List<Object> args = computeMethodParameters(result.getChildren(), "N/A", context);
+                return new ArrayList<>(args);
+            }
+        }
+        if (result.typeOf("grouping")) {
             return evalMultiple(context, result.getChildren());
         }
-        if (type.equals(get("variable"))) {
+        if (result.typeOf("variable")) {
             return context.getOrCreateVariable(result.getText()).get();
         }
-        if (type.equals(get("number"))) {
+        if (result.typeOf("number")) {
             return Double.parseDouble(result.getText());
         }
-        if (type.equals(get("true"))) {
+        if (result.typeOf("true")) {
             return true;
         }
-        if (type.equals(get("false"))) {
+        if (result.typeOf("false")) {
             return false;
         }
-        if (type.equals(get("string"))) {
+        if (result.typeOf("string")) {
             return result.getText();
         }
         return null;
@@ -793,10 +824,17 @@ public class Runner {
         return computeMethodParameters(params, methodName, context, -1);
     }
     private List<Object> computeMethodParameters(List<ParseResult> params, String methodName, RunContext context, int expected) {
+        List<List<ParseResult>> arguments = separateByType(params, get("separator"));
+        if (expected > 0 && arguments.size() != expected) {
+            throw new RunIssue("Invalid number of parameters in call to function named: " + methodName + ". Found " + arguments.size() + " expected " + expected);
+        }
+        return arguments.stream().map(results -> evalMultiple(context, results)).collect(Collectors.toList());
+    }
+    private List<List<ParseResult>> separateByType(List<ParseResult> results, ParseType type) {
         List<List<ParseResult>> arguments = new ArrayList<>();
         List<ParseResult> buffer = new ArrayList<>();
-        for (ParseResult param : params) {
-            if (param.typeOf("separator")) {
+        for (ParseResult param : results) {
+            if (param.getType().equals(type)) {
                 arguments.add(new ArrayList<>(buffer));
                 buffer.clear();
             } else {
@@ -806,10 +844,7 @@ public class Runner {
         if (!buffer.isEmpty()) {
             arguments.add(buffer);
         }
-        if (expected > 0 && arguments.size() != expected) {
-            throw new RunIssue("Invalid number of parameters in call to function named: " + methodName + ". Found " + arguments.size() + " expected " + expected);
-        }
-        return arguments.stream().map(results -> evalMultiple(context, results)).collect(Collectors.toList());
+        return arguments;
     }
 
     private static final ParseType GROUPING = get("grouping");
