@@ -1,3 +1,19 @@
+println(["test"]);
+
+// list = [];
+//
+// list.add(10);
+// println(list);
+// println(list[0]);
+// list[0] = 100;
+// println(list);
+// println(list[0]);
+// list += 15;
+// println(list);
+// list += [ 20, 30, 40, 50, 60, 70 ];
+// println(list);
+
+
 // import java.nio.file.*;
 // import java.util.stream.*;
 //

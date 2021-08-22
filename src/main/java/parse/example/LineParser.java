@@ -91,6 +91,7 @@ public class LineParser extends ParserBranch {
 
     @Override
     public Optional<ParseResult> parse(String text, ParsePosition state) {
+
         List<ParseResult> results = new ArrayList<>();
         int withinParens = 0;
         int withinSquareBrackets = 0;
@@ -177,11 +178,11 @@ public class LineParser extends ParserBranch {
 
             // Handle open and closing square brackets.
             if (currentChar == '[') {
-                if (withinSquareBrackets++ == 0) {
+                if (withinSquareBrackets++ == 0 && withinParens == 0) {
                     continue;
                 }
             } else if (currentChar == ']') {
-                if (--withinSquareBrackets == 0) {
+                if (--withinSquareBrackets == 0 && withinParens == 0) {
                     Optional<ParseResult> result = parse(buffer.toString(), position);
                     if (result.isPresent()) {
                         results.add(new ParseResult(get("square-bracket-grouping"), buffer.toString(), result.get().getChildren()));
@@ -195,11 +196,11 @@ public class LineParser extends ParserBranch {
 
             // Handle open and closing parentheses
             if (currentChar == '(') {
-                if (withinParens++ == 0) {
+                if (withinParens++ == 0 && withinSquareBrackets == 0) {
                     continue;
                 }
             } else if (currentChar == ')') {
-                if (--withinParens == 0) {
+                if (--withinParens == 0 && withinSquareBrackets == 0) {
                     Optional<ParseResult> result = parse(buffer.toString(), position);
                     if (result.isPresent()) {
                         results.add(new ParseResult(get("grouping"), buffer.toString(), result.get().getChildren()));

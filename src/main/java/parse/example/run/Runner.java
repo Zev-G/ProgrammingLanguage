@@ -12,7 +12,6 @@ import parse.example.TypeRegistry;
 import parse.example.reflect.ObjectsRunnableMethod;
 import parse.example.reflect.ReflectionUtils;
 import parse.example.reflect.RunnableMethod;
-import parse.example.reflect.StaticRunnableMethod;
 
 import java.io.PrintStream;
 import java.lang.reflect.*;
