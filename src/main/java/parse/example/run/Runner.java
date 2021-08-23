@@ -399,6 +399,9 @@ public class Runner {
                 return new ArrayList<>(args);
             }
         }
+        if (result.typeOf("error")) {
+            throw new RunIssue("Triggered by user code.");
+        }
         if (result.typeOf("grouping")) {
             return evalMultiple(context, result.getChildren());
         }
@@ -425,10 +428,12 @@ public class Runner {
     private static final List<ParseType> COMPARATORS = Arrays.asList(get("equals"), get("not-equals"), get("or"), get("and"));
     private static final Object UNSET = new Object();
 
+    @SuppressWarnings({"unchecked", "rawtypes"})
     private Object evalMultiple(RunContext context, ParseResults results) {
-        if (results.size() == 1) return eval(context, results.get(0));
-        
-        if (results.size() >= 3) {
+        int size = results.size();
+        if (size == 1) return eval(context, results.get(0));
+
+        if (size >= 3) {
             ParseType type = results.get(1).getType();
             Object left = UNSET;
             Object right = UNSET;
@@ -662,7 +667,7 @@ public class Runner {
                     }
                 }
             }
-            if (results.get(0).getType().equals(get("variable"))) {
+            if (results.get(0).typeOf("variable")) {
                 Variable var = context.getOrCreateVariable(results.get(0).getText());
                 if (results.get(1).typeOf("assignment")) {
                     Object val = evalMultiple(context, results.subList(2));
@@ -705,8 +710,54 @@ public class Runner {
             }
         }
         
-        if (results.size() >= 2) {
+        if (size >= 2) {
             ParseResult resultZero = results.get(0);
+            if (results.get(1).typeOf("square-bracket-grouping")) {
+                ParseResult arrayGrouping = results.get(1);
+                Object left = eval(context, resultZero);
+                boolean isArray = ReflectionUtils.isArray(left);
+                boolean isList = !isArray && left instanceof List<?>;
+                boolean isMap = !isArray && !isList && left instanceof Map<?, ?>;
+                Object insideGrouping = evalMultiple(context, arrayGrouping.getChildren());
+                if (!isArray && !isList && !isMap) {
+                    throw new RunIssue("Tried to access " + left + " as an array, list, or map but its type isn't a valid type of either.");
+                }
+                if (insideGrouping == null) {
+                    throw new RunIssue("Can't search " + left + " for key " + null);
+                }
+                if (!isMap) {
+                    if (!ReflectionUtils.isNum(insideGrouping.getClass())) {
+                        throw new RunIssue("Can't search " + left + " for non integer index");
+                    }
+                    int index = ((Number) insideGrouping).intValue();
+                    if (size >= 4 && results.get(2).typeOf("assignment")) {
+                        Object right = evalMultiple(context, results.subList(3));
+                        if (isArray) {
+                            Array.set(left, index, right);
+                        } else /* (isList) */ {
+                            List asList = (List) left;
+                            if (asList.size() < index) {
+                                throw new RunIssue("Index " + index + " is larger than size of list " + asList + ".");
+                            } else if (asList.size() == index) {
+                                asList.add(right);
+                            } else {
+                                asList.set(index, right);
+                            }
+                        }
+                        return left;
+                    } else {
+                        Object value;
+                        if (isArray) {
+                            value = Array.get(left, index);
+                        } else /* (isList) */ {
+                            value = ((List<?>) left).get(index);
+                        }
+                        return wrappedEvalMultiple(context, value, results, 2);
+                    }
+                } else {
+                    throw new RunIssue("Support for maps not yet implemented.");
+                }
+            }
             if (resultZero.typeOf("variable")) {
                 ParseResult alteration = results.get(1);
                 if (alteration.typeOf("increment")) {

@@ -1,4 +1,6 @@
-println(["test"]);
+
+
+println("Val = " + Arrays.asList("one", "two", "three")[1]);
 
 // list = [];
 //
