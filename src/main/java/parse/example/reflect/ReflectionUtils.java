@@ -339,4 +339,22 @@ public final class ReflectionUtils {
             obj instanceof boolean[] ? ((boolean[]) obj).length : -1;
     }
 
+    @SuppressWarnings("unchecked")
+    @SafeVarargs
+    public static <T> T[] joinArrays(Class<T> type, T[]... arrays) {
+        int newLength = 0;
+        for (T[] array : arrays) {
+            newLength += array.length;
+        }
+        T[] newArray = (T[]) Array.newInstance(type, newLength);
+        int i = 0;
+        for (T[] array : arrays) {
+            for (T obj : array) {
+                newArray[i] = obj;
+                i++;
+            }
+        }
+        return newArray;
+    }
+
 }

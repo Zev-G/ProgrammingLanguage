@@ -65,4 +65,8 @@ public class ParseResults extends ArrayList<ParseResult> {
         return -1;
     }
 
+    public ParseResult last() {
+        return get(size() - 1);
+    }
+
 }

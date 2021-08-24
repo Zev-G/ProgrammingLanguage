@@ -34,6 +34,10 @@ import static parse.example.TypeRegistry.get;
  *     <li>(DONE) Methods of objects.</li>
  *     <li>(DONE) Fields of objects.</li>
  *     <li>(DONE) Accessing java classes.</li>
+ *     <h2>Implementing OOP</h2>
+ *     <ul>
+ *         <li>Stop constructors from being runnable as normal functions inside of files.</li>
+ *     </ul>
  * </ul>
  * <h1>To be fixed:</h1>
  * <ul>
@@ -48,6 +52,8 @@ import static parse.example.TypeRegistry.get;
 public class Runner {
 
     private final RunContext global = new RunContext();
+    private final StaticContext staticContext;
+
     private PrintStream out = System.out;
     
     private boolean trackEvaluating = false;
@@ -60,6 +66,10 @@ public class Runner {
     private ParseResult currentLine;
 
     public Runner() {
+        this(new StaticContext());
+    }
+    public Runner(StaticContext staticContext) {
+        this.staticContext = staticContext;
         global.registerFunction("print", new Function(Collections.singleton("text")) {
             @Override
             public Object run(RunContext context, Object... params) {
@@ -140,7 +150,7 @@ public class Runner {
         // Run
         return run(global, result);
     }
-    private Object run(RunContext context, ParseResult result) {
+    public Object run(RunContext context, ParseResult result) {
         // Check for illegal types.
         if (result.getType().equals(TypeRegistry.get("method-declaration"))) {
             throw new RunIssue("Can't register function from this point.");
@@ -201,8 +211,16 @@ public class Runner {
     }
     private void registerFunction(RunContext context, ParseResult declaration, ParseResult body) {
         String methodName = declaration.getChildren().get(0).getText();
+        context.registerFunction(methodName, createFunction(declaration, body, context));
+    }
+
+    public Function createFunction(ParseResult statement, RunContext context) {
+        return createFunction(statement.getChildren().get(0).getChildren().get(0), statement.getChildren().get(1), context);
+    }
+    public Function createFunction(ParseResult declaration, ParseResult body, RunContext context) {
+        String methodName = declaration.getChildren().get(0).getText();
         List<String> params = declaration.getChildren().get(1).getChildren().stream().map(ParseResult::getText).collect(Collectors.toList());
-        context.registerFunction(methodName, new Function(params) {
+        return new Function(params) {
             @Override
             public Object run(RunContext context1, Object... vars) {
                 if (params.size() != vars.length) {
@@ -220,7 +238,7 @@ public class Runner {
                     return returned;
                 }
             }
-        });
+        };
     }
 
     private Object runStatement(RunContext context, ParseResult header, ParseResult body) {

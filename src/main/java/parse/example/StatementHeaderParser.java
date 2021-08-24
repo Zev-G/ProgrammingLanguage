@@ -9,12 +9,11 @@ public class StatementHeaderParser extends ParserBranch {
 
     private static final List<String> BANNED_FUNCTION_NAMES = Arrays.asList("if", "else", "else if", "elif", "for", "while");
 
-    private final LineParser lineParser;
+    private LineParser lineParser;
 
     private final Parser methodDeclarationParser = (text, state) -> {
         StringBuilder buffer = new StringBuilder();
         boolean inParams = false;
-        boolean afterName = false;
         boolean ended = false;
 
         String name = null;
@@ -56,21 +55,31 @@ public class StatementHeaderParser extends ParserBranch {
                 buffer = new StringBuilder();
                 continue;
             }
-            if (currentChar == ' ') {
-                afterName = true;
-                continue;
-            }
-            if (Character.isLetter(currentChar) && afterName && !inParams) {
-                return Optional.empty();
-            }
             buffer.append(currentChar);
         }
         if (name != null) {
             if (BANNED_FUNCTION_NAMES.contains(name)) {
                 return Optional.empty();
             }
+            List<ParseResult> prefixes = new ArrayList<>();
+            // This if statement handles modifiers like private and public for method-declarations.
+            if (name.contains(" ")) {
+                String[] pieces = name.split(" ");
+                for (int i = 0, piecesLength = pieces.length; i < piecesLength - 1; i++) {
+                    String piece = pieces[i];
+                    Optional<ParseResult> result = lineParser.parse(piece, state);
+                    if (result.isPresent() && !result.get().getChildren().isEmpty()) {
+                        prefixes.addAll(result.get().getChildren());
+                    } else {
+                        return Optional.empty();
+                    }
+                }
+                name = pieces[pieces.length - 1];
+            }
             ParseResult paramsResult = new ParseResult(TypeRegistry.get("parameters"), String.join(",", params), params.stream().map(param -> new ParseResult(TypeRegistry.get("parameter"), param)).collect(Collectors.toList()));
-            return Optional.of(new ParseResult(TypeRegistry.get("method-declaration"), text, new ParseResult(TypeRegistry.get("method-name"), name), paramsResult));
+            ParseResult result = new ParseResult(TypeRegistry.get("method-declaration"), text, new ParseResult(TypeRegistry.get("method-name"), name), paramsResult);
+            result.getChildren().addAll(0, prefixes);
+            return Optional.of(result);
         } else {
             return Optional.empty();
         }

@@ -1,20 +1,24 @@
 
+System.in = null;
 
-println("Val = " + Arrays.asList("one", "two", "three")[1]);
-
-// list = [];
+// reverse(text) {
+//     array = text.split("");
+//     reversed = "";
+//     for (i in range(0, array.length)) {
+//         reversed = array[i] + reversed;
+//     }
+//     return reversed;
+// }
 //
-// list.add(10);
-// println(list);
-// println(list[0]);
-// list[0] = 100;
-// println(list);
-// println(list[0]);
-// list += 15;
-// println(list);
-// list += [ 20, 30, 40, 50, 60, 70 ];
-// println(list);
-
+// scanner = new Scanner(System.in);
+//
+// println("Type some text and it will be reversed. Type \"exit\" to stop.");
+//
+// input = scanner.nextLine();
+// while (!input.equalsIgnoreCase("exit")) {
+//     println(reverse(input));
+//     input = scanner.nextLine();
+// }
 
 // import java.nio.file.*;
 // import java.util.stream.*;

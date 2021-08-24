@@ -1,9 +1,14 @@
 package parse.example.run;
 
+import parse.example.run.oo.AccessModifier;
+
 public interface Variable {
 
     void set(Object obj);
     Object get();
+    default AccessModifier getAccessModifier() {
+        return AccessModifier.PRIVATE;
+    }
 
     static Variable empty() {
         return new Variable() {

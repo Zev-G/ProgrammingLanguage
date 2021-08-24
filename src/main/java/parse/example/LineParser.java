@@ -71,6 +71,9 @@ public class LineParser extends ParserBranch {
                 },
                 new Literal(".", get("period")),
 
+                new Literal("final", get("final")), new Literal("static", get("static")),
+                new Literal("public", get("public")), new Literal("private", get("private")), new Literal("protected", get("protected")), new Literal("package", get("package")),
+
                 new Literal(" : ", get("for-each")), new Literal(" in ", get("for-each")),
                 new Literal(" typeof ", get("instanceof")), new Literal(" instanceof ", get("instanceof")),
 
