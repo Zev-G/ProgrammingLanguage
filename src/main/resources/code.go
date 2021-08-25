@@ -1,9 +1,10 @@
-array = [];
+private array = [];
 
 array[0] = 10;
 array[0] += 10;
 
 println(array);
+println(this.array);
 
 // reverse(text) {
 //     array = text.split("");

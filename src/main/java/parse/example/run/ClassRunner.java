@@ -41,12 +41,11 @@ public class ClassRunner {
             if (!definition.containsConstructor(constructor)) throw new IllegalArgumentException();
         } else if (definition.getConstructors().length != 0) throw new IllegalArgumentException();
 
-        final InternalObject internalThis = new InternalObject(this);
-
         RunContext instanceContext = new RunContext(runner.getGlobal());
+        final InternalObject internalThis = new InternalObject(this, instanceContext);
         instanceContext.getOrCreateVariable("this", internalThis);
 
-        createInstanceFields(instanceContext);
+        createInstanceFields(instanceContext, internalThis);
 
         if (constructor != null) {
             Function runnableConstructor = runner.createFunction(constructor.getCode(), instanceContext);
@@ -58,15 +57,16 @@ public class ClassRunner {
         return internalThis;
     }
 
-    private void createInstanceFields(RunContext instanceContext) {
+    private void createInstanceFields(RunContext instanceContext, InternalObject object) {
         for (FieldDefinition field : definition.getFields()) {
             if (!field.isStatic()) {
-                createField(field, instanceContext);
+                Variable fieldVar = createField(field, instanceContext);
+                object.getFields().put(field.getName(), fieldVar);
             }
         }
     }
 
-    private void createField(FieldDefinition field, RunContext context) {
+    private Variable createField(FieldDefinition field, RunContext context) {
         ParseResult code = field.getCode();
 
         List<ParseResult> codeChildrenCopy = new ArrayList<>(code.getChildren());
@@ -77,11 +77,12 @@ public class ClassRunner {
         }
 
         ParseResult runCopy = new ParseResult(code.getType(), code.getText(), codeChildrenCopy);
+
         runner.run(context, runCopy, ERI.DEFAULT);
-        Variable created = context.getVariable(field.getName());
+        Variable created = context.getVariables().get(field.getName());
         if (created == null) throw new IllegalStateException();
-        context.getVariables().put(field.getName(), new Variable() {
-            Object val;
+        Variable fieldVar = new Variable() {
+            Object val = created.get();
 
             @Override
             public void set(Object obj) {
@@ -97,7 +98,9 @@ public class ClassRunner {
             public AccessModifier getAccessModifier() {
                 return field.getAccessModifier();
             }
-        });
+        };
+        context.getVariables().put(field.getName(), fieldVar);
+        return fieldVar;
     }
 
     private void strip() {

@@ -616,6 +616,10 @@ public class Runner {
                             return null;
                         }
                     }
+                    if (left instanceof InternalObject) {
+                        InternalObject asInternalObject = (InternalObject) left;
+                        return asInternalObject.getFields().get(fieldName).get();
+                    }
                     try {
                         Field field;
                         if (left instanceof StaticClass) {
