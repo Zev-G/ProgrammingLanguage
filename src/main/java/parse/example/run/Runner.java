@@ -12,6 +12,7 @@ import parse.example.TypeRegistry;
 import parse.example.reflect.ObjectsRunnableMethod;
 import parse.example.reflect.ReflectionUtils;
 import parse.example.reflect.RunnableMethod;
+import parse.example.run.oo.InternalObject;
 
 import java.io.PrintStream;
 import java.lang.reflect.*;
@@ -72,29 +73,29 @@ public class Runner {
         this.staticContext = staticContext;
         global.registerFunction("print", new Function(Collections.singleton("text")) {
             @Override
-            public Object run(RunContext context, Object... params) {
+            public Object run(RunContext context, ERI eri, Object... params) {
                 out.print(params[0]);
                 return null;
             }
         });
         global.registerFunction("println", new Function(Collections.singleton("text")) {
             @Override
-            public Object run(RunContext context, Object... params) {
+            public Object run(RunContext context, ERI eri, Object... params) {
                 out.println(params[0]);
                 return null;
             }
         });
         global.registerFunction("run", new Function(Collections.singleton("code")) {
             @Override
-            public Object run(RunContext context, Object... params) {
+            public Object run(RunContext context, ERI eri, Object... params) {
                 String text = String.valueOf(params[0]);
                 Optional<ParseResult> parse = new MultiLineParser().parse(text, new ParsePosition(text, 0));
-                return parse.map(result -> Runner.this.run(context, result)).orElse(null);
+                return parse.map(result -> Runner.this.run(context, result, eri)).orElse(null);
             }
         });
         global.registerFunction("range", new Function(List.of("begin", "end")) {
             @Override
-            public Object run(RunContext context, Object... params) {
+            public Object run(RunContext context, ERI eri, Object... params) {
                 Object begin = params[0];
                 Object end = params[1];
                 if (!(begin instanceof Number) || !(end instanceof Number)) {
@@ -105,7 +106,7 @@ public class Runner {
         });
         global.registerFunction("registerInstanceMethodsOf", new Function(Collections.singleton("object")) {
             @Override
-            public Object run(RunContext context, Object... params) {
+            public Object run(RunContext context, ERI eri, Object... params) {
                 Object obj = params[0];
                 for (Method method : obj.getClass().getMethods()) {
                     if (!Modifier.isStatic(method.getModifiers())) {
@@ -117,7 +118,7 @@ public class Runner {
         });
         global.registerFunction("registerStaticMethodsOf", new Function(Collections.singleton("object")) {
             @Override
-            public Object run(RunContext context, Object... params) {
+            public Object run(RunContext context, ERI eri, Object... params) {
                 Object obj = params[0];
                 for (Method method : (obj instanceof Class<?> ? (Class<?>) obj : obj.getClass()).getMethods()) {
                     if (Modifier.isStatic(method.getModifiers())) {
@@ -132,6 +133,9 @@ public class Runner {
     }
 
     public Object run(ParseResult result) {
+        return run(result, ERI.DEFAULT);
+    }
+    public Object run(ParseResult result, ERI eri) {
         // Look for imports
         for (ParseResult child : result.getChildren()) {
             if (child.typeOf(ImportParser.TYPE)) {
@@ -148,9 +152,9 @@ public class Runner {
         }
 
         // Run
-        return run(global, result);
+        return run(global, result, eri);
     }
-    public Object run(RunContext context, ParseResult result) {
+    public Object run(RunContext context, ParseResult result, ERI eri) {
         // Check for illegal types.
         if (result.getType().equals(TypeRegistry.get("method-declaration"))) {
             throw new RunIssue("Can't register function from this point.");
@@ -176,7 +180,7 @@ public class Runner {
         if (type == get("statement")) {
             ParseResult header = result.getChildren().get(0);
             ParseResult body = result.getChildren().get(1);
-            return runStatement(context, header, body);
+            return runStatement(context, header, body, eri);
         } else {
             context.setReadyForElse(false);
         }
@@ -184,7 +188,7 @@ public class Runner {
         if (type == get("multi-lines") || type == get("body")) {
             Object last = null;
             for (ParseResult child : result.getChildren()) {
-                last = run(context, child);
+                last = run(context, child, eri);
                 if (last instanceof ReturnedObject) {
                     return last;
                 }
@@ -204,7 +208,7 @@ public class Runner {
                     e.printStackTrace();
                 }
             }
-            return evalMultiple(context, result.getChildren());
+            return evalMultiple(context, result.getChildren(), eri);
         }
         // Something has gone wrong if none of the previous checks have returned something.
         throw new RunIssue("Couldn't run: " + result);
@@ -222,7 +226,7 @@ public class Runner {
         List<String> params = declaration.getChildren().get(1).getChildren().stream().map(ParseResult::getText).collect(Collectors.toList());
         return new Function(params) {
             @Override
-            public Object run(RunContext context1, Object... vars) {
+            public Object run(RunContext context1, ERI eri, Object... vars) {
                 if (params.size() != vars.length) {
                     throw new RunIssue("Invalid number of parameters in method call to method: " + methodName);
                 }
@@ -231,7 +235,7 @@ public class Runner {
                     String param = params.get(i);
                     functionContext.registerVariable(param, Variable.of(vars[i]));
                 }
-                Object returned = Runner.this.run(functionContext, body);
+                Object returned = Runner.this.run(functionContext, body, eri);
                 if (returned instanceof ReturnedObject) {
                     return ((ReturnedObject) returned).value;
                 } else {
@@ -241,10 +245,10 @@ public class Runner {
         };
     }
 
-    private Object runStatement(RunContext context, ParseResult header, ParseResult body) {
+    private Object runStatement(RunContext context, ParseResult header, ParseResult body, ERI eri) {
         RunContext newContext = new RunContext(context);
         if (header.getChildren().isEmpty()) {
-            return run(newContext, body);
+            return run(newContext, body, eri);
         } else {
             ParseResult headerLine = header.getChildren().get(0);
             if (headerLine.getType().equals(TypeRegistry.get("method-declaration"))) {
@@ -255,12 +259,12 @@ public class Runner {
                 if (defining.typeOf("elif") && !context.isReadyForElse()){
                     return null;
                 }
-                Object check = evalMultiple(context, headerLine.getChildren().subList(1, headerLine.getChildren().size()));
+                Object check = evalMultiple(context, headerLine.getChildren().subList(1, headerLine.getChildren().size()), eri);
                 if (check instanceof Boolean) {
                     boolean checkVal = (Boolean) check;
                     if (checkVal) {
                         context.setReadyForElse(false);
-                        return run(newContext, body);
+                        return run(newContext, body, eri);
                     } else {
                         context.setReadyForElse(true);
                         return false;
@@ -272,7 +276,7 @@ public class Runner {
             if (defining.typeOf("else")) {
                 if (context.isReadyForElse()) {
                     context.setReadyForElse(false);
-                    return run(newContext, body);
+                    return run(newContext, body, eri);
                 } else {
                     return null;
                 }
@@ -301,9 +305,9 @@ public class Runner {
                     if (internalChildren.size() >= 5 && internalChildren.get(1).typeOf("separator") && internalChildren.get(2).typeOf("variable")) {
                         indexVar = newContext.getOrCreateVariable(internalChildren.get(2).getText());
 
-                        iterator = evalMultiple(newContext, internalChildren.subList(4, internalChildren.size()));
+                        iterator = evalMultiple(newContext, internalChildren.subList(4, internalChildren.size()), eri);
                     } else {
-                        iterator = evalMultiple(newContext, internalChildren.subList(2, internalChildren.size()));
+                        iterator = evalMultiple(newContext, internalChildren.subList(2, internalChildren.size()), eri);
                     }
                     // Create main variable
                     var = newContext.getOrCreateVariable(internalChildren.get(0).getText());
@@ -344,7 +348,7 @@ public class Runner {
                             i++;
                         }
                         var.set(obj);
-                        last = run(new RunContext(newContext), body);
+                        last = run(new RunContext(newContext), body, eri);
                         if (last instanceof ReturnedObject) {
                             break;
                         }
@@ -371,8 +375,8 @@ public class Runner {
                     ParseResults runAfter = separatedSections.get(2);
 
                     Object last = null;
-                    for (evalMultiple(newContext, runFirst); evalAsBoolean(newContext, checkEachTime); evalMultiple(newContext, runAfter)) {
-                        last = run(new RunContext(newContext), body);
+                    for (evalMultiple(newContext, runFirst, eri); evalAsBoolean(newContext, checkEachTime, eri); evalMultiple(newContext, runAfter, eri)) {
+                        last = run(new RunContext(newContext), body, eri);
                         if (last instanceof ReturnedObject) {
                             break;
                         }
@@ -385,8 +389,8 @@ public class Runner {
             if (defining.typeOf("while")) {
                 ParseResults check = headerLine.getChildren().subList(1, headerLine.getChildren().size());
                 Object last = null;
-                while ((Boolean) evalMultiple(newContext, check)) {
-                    last = run(context, body);
+                while ((Boolean) evalMultiple(newContext, check, eri)) {
+                    last = run(context, body, eri);
                     if (last instanceof ReturnedObject) {
                         break;
                     }
@@ -398,14 +402,14 @@ public class Runner {
         throw new RunIssue("Couldn't run statement: " + header + " " + body);
     }
 
-    private boolean evalAsBoolean(RunContext newContext, ParseResults checkEachTime) {
+    private boolean evalAsBoolean(RunContext newContext, ParseResults checkEachTime, ERI eri) {
         if (checkEachTime.isEmpty()) return true;
-        Object result = evalMultiple(newContext, checkEachTime);
+        Object result = evalMultiple(newContext, checkEachTime, eri);
         if (result instanceof Boolean) return (boolean) result;
         throw new RunIssue("Can't use " + result + " as boolean.");
     }
 
-    private Object eval(RunContext context, ParseResult result) {
+    private Object eval(RunContext context, ParseResult result, ERI eri) {
         if (result instanceof ParseResultWrapper) {
             return ((ParseResultWrapper) result).getValue();
         }
@@ -413,7 +417,7 @@ public class Runner {
             if (result.getChildren().isEmpty()) {
                 return new ArrayList<>();
             } else {
-                List<Object> args = computeMethodParameters(result.getChildren(), "N/A", context);
+                List<Object> args = computeMethodParameters(result.getChildren(), "N/A", context, eri);
                 return new ArrayList<>(args);
             }
         }
@@ -421,9 +425,15 @@ public class Runner {
             throw new RunIssue("Triggered by user code.");
         }
         if (result.typeOf("grouping")) {
-            return evalMultiple(context, result.getChildren());
+            return evalMultiple(context, result.getChildren(), eri);
         }
         if (result.typeOf("variable")) {
+            if (eri.isLookingForStaticClass()) {
+                var searchResult = context.findClass(result.getText());
+                if (searchResult.isPresent()) {
+                    return StaticClass.forClass(searchResult.get());
+                }
+            }
             return context.getOrCreateVariable(result.getText()).get();
         }
         if (result.typeOf("number")) {
@@ -447,14 +457,132 @@ public class Runner {
     private static final Object UNSET = new Object();
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private Object evalMultiple(RunContext context, ParseResults results) {
+    private Object evalMultiple(RunContext context, ParseResults results, ERI eri) {
+        eri.reachedCheckpoint(0);
         int size = results.size();
-        if (size == 1) return eval(context, results.get(0));
+        if (size == 1) return eval(context, results.get(0), eri);
+        eri.reachedCheckpoint(1);
 
         if (size >= 3) {
             ParseType type = results.get(1).getType();
             Object left = UNSET;
             Object right = UNSET;
+            int equalPos;
+            if ((equalPos = results.firstMatch(result -> result.typeOf("assignment") || LineParser.NUMERIC_ASSIGNMENTS.contains(result.getType()))) >= 1) {
+                Variable var;
+                String varName;
+                ParseResult assignment = results.get(equalPos);
+                if (results.get(0).typeOf("variable") && equalPos == 1) {
+                    var = context.getOrCreateVariable(results.get(0).getText());
+                    varName = results.get(0).getText();
+                } else if (results.get(equalPos - 1).typeOf("variable") && results.get(equalPos - 2).typeOf("period")) {
+                    Object upTo = evalMultiple(context, results.subList(0, equalPos - 2), eri.changedLookingForStaticClass(true).addAutoRemovingCheckpoint(1, eri1 -> eri1.setLookingForStaticClass(false)));
+                    if (upTo instanceof InternalObject) {
+                        throw new RunIssue("Accessing internal fields is not yet supported.");
+                    } else {
+                        if (upTo == null) throw new RunIssue("Tried to access field of null object.");
+                        try {
+                            Class<?> upToClass = upTo instanceof StaticClass ? ((StaticClass) upTo).getRepresentedClass() : upTo.getClass();
+
+                            Field field = upToClass.getField(results.get(equalPos - 1).getText());
+                            varName = field.getName();
+                            var = Variable.fromJavaField(field, Modifier.isStatic(field.getModifiers()) ? null : upTo);
+                        } catch (NoSuchFieldException e) {
+                            throw new RunIssue("No field named \"" + results.get(equalPos - 1).getText() + "\" on object \"" + upTo + "\".");
+                        }
+                    }
+                } else if (results.get(equalPos - 1).typeOf("square-bracket-grouping")) {
+                    varName = "array";
+                    Object array = evalMultiple(context, results.subList(0, equalPos - 1), eri);
+                    boolean isArray = ReflectionUtils.isArray(array);
+                    boolean isList = !isArray && array instanceof List<?>;
+                    boolean isMap = !isArray && !isList && array instanceof Map<?, ?>;
+                    Object insideGrouping = evalMultiple(context, results.get(equalPos - 1).getChildren(), eri);
+                    if (!isArray && !isList && !isMap) {
+                        throw new RunIssue("Tried to access " + array + " as an array, list, or map but its type isn't a valid type of either.");
+                    }
+                    if (insideGrouping == null) {
+                        throw new RunIssue("Can't search " + array + " for key " + null);
+                    }
+                    if (!isMap) {
+                        if (!ReflectionUtils.isNum(insideGrouping.getClass())) {
+                            throw new RunIssue("Can't search " + array + " for non integer index");
+                        }
+                        int index = ((Number) insideGrouping).intValue();
+                        if (isArray) {
+                            var = new Variable() {
+                                @Override
+                                public void set(Object obj) {
+                                    Array.set(array, index, obj);
+                                }
+
+                                @Override
+                                public Object get() {
+                                    return Array.get(array, index);
+                                }
+                            };
+                        } else {
+                            List list = (List) array;
+                            var = new Variable() {
+                                @Override
+                                public void set(Object obj) {
+                                    if (index == list.size()) {
+                                        list.add(obj);
+                                    } else {
+                                        list.set(index, obj);
+                                    }
+                                }
+
+                                @Override
+                                public Object get() {
+                                    return list.get(index);
+                                }
+                            };
+                        }
+                    } else {
+                        throw new RunIssue("Support for maps not yet implemented.");
+                    }
+                } else {
+                    throw new RunIssue("Illegal use of assignment.");
+                }
+                if (assignment.typeOf("assignment")) {
+                    Object val = evalMultiple(context, results.subList(equalPos + 1), eri);
+                    var.set(val);
+                    return val;
+                } else if (LineParser.NUMERIC_ASSIGNMENTS.contains(assignment.getType())) {
+                    Object varVal = var.get();
+                    if (varVal == null) {
+                        varVal = 0;
+                    }
+                    if (!(varVal instanceof Number)) {
+                        throw new RunIssue("Can't perform \"" + assignment.getText() + "\" on variable \"" + varName + "\" because its value isn't a number.");
+                    }
+                    if (right == UNSET) {
+                        right = evalMultiple(context, results.subList(equalPos + 1), eri);
+                    }
+                    if (!(right instanceof Number)) {
+                        throw new RunIssue("Can't perform \"" + assignment.getText() + "\" on variable \"" + varName + "\" because value \"" + right + "\" isn't a number.");
+                    }
+                    double varAsNum = ((Number) varVal).doubleValue();
+                    double rightAsNum = ((Number) right).doubleValue();
+                    Object newVal;
+                    if (assignment.typeOf("plus-equals")) {
+                        newVal = varAsNum + rightAsNum;
+                    } else if (assignment.typeOf("minus-equals")) {
+                        newVal = varAsNum - rightAsNum;
+                    } else if (assignment.typeOf("times-equals")) {
+                        newVal = varAsNum * rightAsNum;
+                    } else if (assignment.typeOf("divide-equals")) {
+                        newVal = varAsNum / rightAsNum;
+                    } else if (assignment.typeOf("modulo-equals")) {
+                        newVal = varAsNum % rightAsNum;
+                    } else {
+                        throw new IllegalStateException();
+                    }
+                    var.set(newVal);
+                    return newVal;
+                }
+            }
             if (results.get(1).typeOf("period")) {
                 ParseResult zero = results.get(0);
                 if (zero.typeOf("variable") || zero.typeOf("for-each") || zero.typeOf("elif")) {
@@ -464,7 +592,7 @@ public class Runner {
                     }
                 }
                 if (left == UNSET) {
-                    left = eval(context, zero);
+                    left = eval(context, zero, eri);
                 }
                 ParseResults member = results.subList(2, results.size());
                 if (member.get(0).typeOf("for-each") || member.get(0).typeOf("elif")) {
@@ -474,16 +602,16 @@ public class Runner {
                     String fieldName = member.get(0).getText();
                     // Handle length of arrays.
                     if (fieldName.equals("length") && ReflectionUtils.isArray(left)) {
-                        return wrappedEvalMultiple(context, ReflectionUtils.length(left), member, 1);
+                        return wrappedEvalMultiple(context, ReflectionUtils.length(left), member, 1, eri);
                     }
                     // Handle "System.class"
                     if (fieldName.equals("class")) {
                         if (left instanceof StaticClass) {
-                            return wrappedEvalMultiple(context, ((StaticClass) left).getRepresentedClass(), member, 1);
+                            return wrappedEvalMultiple(context, ((StaticClass) left).getRepresentedClass(), member, 1, eri);
                         } else if (left instanceof Class<?>) {
-                            return wrappedEvalMultiple(context, left, member, 1);
+                            return wrappedEvalMultiple(context, left, member, 1, eri);
                         } else if (left != null) {
-                            return wrappedEvalMultiple(context, left.getClass(), member, 1);
+                            return wrappedEvalMultiple(context, left.getClass(), member, 1, eri);
                         } else {
                             return null;
                         }
@@ -499,7 +627,7 @@ public class Runner {
                             if (Modifier.isStatic(field.getModifiers())) {
                                 left = null;
                             }
-                            return wrappedEvalMultiple(context, field.get(left), member, 1);
+                            return wrappedEvalMultiple(context, field.get(left), member, 1, eri);
                         } catch (IllegalAccessException e) {
                             throw new RunIssue("Can't access field \"" + field + "\"");
                         }
@@ -508,7 +636,7 @@ public class Runner {
                     }
                 } else if (member.size() >= 2) { // Method
                     String methodName = member.get(0).getText();
-                    List<Object> arguments = computeMethodParameters(member.get(1).getChildren(), methodName, context);
+                    List<Object> arguments = computeMethodParameters(member.get(1).getChildren(), methodName, context, eri);
 
                     Optional<Method> method;
                     if (left instanceof StaticClass) {
@@ -532,7 +660,7 @@ public class Runner {
                         if (!method.get().canAccess(use)) {
                             method.get().setAccessible(true);
                         }
-                        return wrappedEvalMultiple(context, ReflectionUtils.invoke(method.get(), use, arguments.toArray()), member, 2);
+                        return wrappedEvalMultiple(context, ReflectionUtils.invoke(method.get(), use, arguments.toArray()), member, 2, eri);
                     } catch (IllegalAccessException e) {
                         throw new RunIssue("Can't access method \"" + method.get().toGenericString() + "\".");
                     } catch (InvocationTargetException e) {
@@ -544,7 +672,7 @@ public class Runner {
             if (instanceOfLoc != -1) {
                 if (instanceOfLoc + 1 < results.size()) {
                     ParseResults upToInstanceOf = results.subList(0, instanceOfLoc);
-                    left = evalMultiple(context, upToInstanceOf);
+                    left = evalMultiple(context, upToInstanceOf, eri);
                     String checkType = results.get(instanceOfLoc + 1).getText();
                     Class<?> typeVal = context.findClass(checkType).orElseThrow(() -> new RunIssue("Couldn't find type \"" + checkType + "\""));
                     return typeVal.isInstance(left);
@@ -557,12 +685,12 @@ public class Runner {
                     String name = results.get(1).getText();
                     Optional<Class<?>> referencedClass = context.findClass(name);
                     if (referencedClass.isPresent()) {
-                        Object[] arguments = computeMethodParameters(results.get(2).getChildren(), "new " + name + "(...)", context).toArray();
+                        Object[] arguments = computeMethodParameters(results.get(2).getChildren(), "new " + name + "(...)", context, eri).toArray();
                         Optional<Constructor<Object>> constructor = ReflectionUtils.findConstructor(referencedClass.get(), arguments);
                         if (constructor.isPresent()) {
                             arguments = ReflectionUtils.convertArgs(constructor.get().getParameters(), arguments);
                             try {
-                                return wrappedEvalMultiple(context, constructor.get().newInstance(arguments), results, 3);
+                                return wrappedEvalMultiple(context, constructor.get().newInstance(arguments), results, 3, eri);
                             } catch (InstantiationException | InvocationTargetException e) {
                                 throw new RunIssue("Couldn't instantiate " + name + ".");
                             } catch (IllegalAccessException e) {
@@ -580,9 +708,9 @@ public class Runner {
             }
             if (STRING_TYPES.contains(type)) {
                 if (left == UNSET) {
-                    left = eval(context, results.get(0));
+                    left = eval(context, results.get(0), eri);
                 }
-                right = evalMultiple(context, results.subList(2));
+                right = evalMultiple(context, results.subList(2), eri);
                 if (left instanceof String || right instanceof String) {
                     if (type.equals(get("plus"))) {
                         return left + String.valueOf(right);
@@ -598,11 +726,11 @@ public class Runner {
             }
             if (MATH_TYPES.contains(type)) {
                 if (left == UNSET) {
-                    left = eval(context, results.get(0));
+                    left = eval(context, results.get(0), eri);
                 }
                 if (left instanceof Number) {
                     if (right == UNSET) {
-                        right = evalMultiple(context, results.subList(2));
+                        right = evalMultiple(context, results.subList(2), eri);
                     }
                     if (right instanceof Number) {
                         Number leftNum = (Number) left;
@@ -641,11 +769,11 @@ public class Runner {
             }
             if (COMPARATORS.contains(type)) {
                 if (left == UNSET) {
-                    left = eval(context, results.get(0));
+                    left = eval(context, results.get(0), eri);
                 }
                 if (type.equals(get("equals")) || type.equals(get("not-equal"))) {
                     if (right == UNSET) {
-                        right = evalMultiple(context, results.subList(2));
+                        right = evalMultiple(context, results.subList(2), eri);
                     }
                     boolean equal = Objects.equals(left, right);
                     if (type.equals(get("equals"))) {
@@ -661,7 +789,7 @@ public class Runner {
                             return false;
                         }
                         if (right == UNSET) {
-                            right = evalMultiple(context, results.subList(2));
+                            right = evalMultiple(context, results.subList(2), eri);
                         }
                         Object rightObj = right;
                         if (rightObj instanceof Boolean) {
@@ -676,7 +804,7 @@ public class Runner {
                             return true;
                         }
                         if (right == UNSET) {
-                            right = evalMultiple(context, results.subList(2));
+                            right = evalMultiple(context, results.subList(2), eri);
                         }
                         Object rightObj = right;
                         if (rightObj instanceof Boolean) {
@@ -685,58 +813,17 @@ public class Runner {
                     }
                 }
             }
-            if (results.get(0).typeOf("variable")) {
-                Variable var = context.getOrCreateVariable(results.get(0).getText());
-                if (results.get(1).typeOf("assignment")) {
-                    Object val = evalMultiple(context, results.subList(2));
-                    var.set(val);
-                    return val;
-                } else if (LineParser.NUMERIC_ASSIGNMENTS.contains(type)) {
-                    Object varVal = var.get();
-                    if (varVal == null) {
-                        varVal = 0;
-                    }
-                    if (!(varVal instanceof Number)) {
-                        throw new RunIssue("Can't perform \"" + results.get(1).getText() + "\" on variable \"" + results.get(0).getText() + "\" because its value isn't a number.");
-                    }
-                    if (right == UNSET) {
-                        right = evalMultiple(context, results.subList(2));
-                    }
-                    if (!(right instanceof Number)) {
-                        throw new RunIssue("Can't perform \"" + results.get(1).getText() + "\" on variable \"" + results.get(0).getText() + "\" because value \"" + right + "\" isn't a number.");
-                    }
-                    double varAsNum = ((Number) varVal).doubleValue();
-                    double rightAsNum = ((Number) right).doubleValue();
-                    Object newVal;
-                    ParseResult typeHolder = results.get(1);
-                    if (typeHolder.typeOf("plus-equals")) {
-                        newVal = varAsNum + rightAsNum;
-                    } else if (typeHolder.typeOf("minus-equals")) {
-                        newVal = varAsNum - rightAsNum;
-                    } else if (typeHolder.typeOf("times-equals")) {
-                        newVal = varAsNum * rightAsNum;
-                    } else if (typeHolder.typeOf("divide-equals")) {
-                        newVal = varAsNum / rightAsNum;
-                    } else if (typeHolder.typeOf("modulo-equals")) {
-                        newVal = varAsNum  %rightAsNum;
-                    } else {
-                        throw new IllegalStateException();
-                    }
-                    var.set(newVal);
-                    return newVal;
-                }
-            }
         }
         
         if (size >= 2) {
             ParseResult resultZero = results.get(0);
             if (results.get(1).typeOf("square-bracket-grouping")) {
                 ParseResult arrayGrouping = results.get(1);
-                Object left = eval(context, resultZero);
+                Object left = eval(context, resultZero, eri);
                 boolean isArray = ReflectionUtils.isArray(left);
                 boolean isList = !isArray && left instanceof List<?>;
                 boolean isMap = !isArray && !isList && left instanceof Map<?, ?>;
-                Object insideGrouping = evalMultiple(context, arrayGrouping.getChildren());
+                Object insideGrouping = evalMultiple(context, arrayGrouping.getChildren(), eri);
                 if (!isArray && !isList && !isMap) {
                     throw new RunIssue("Tried to access " + left + " as an array, list, or map but its type isn't a valid type of either.");
                 }
@@ -748,30 +835,13 @@ public class Runner {
                         throw new RunIssue("Can't search " + left + " for non integer index");
                     }
                     int index = ((Number) insideGrouping).intValue();
-                    if (size >= 4 && results.get(2).typeOf("assignment")) {
-                        Object right = evalMultiple(context, results.subList(3));
-                        if (isArray) {
-                            Array.set(left, index, right);
-                        } else /* (isList) */ {
-                            List asList = (List) left;
-                            if (asList.size() < index) {
-                                throw new RunIssue("Index " + index + " is larger than size of list " + asList + ".");
-                            } else if (asList.size() == index) {
-                                asList.add(right);
-                            } else {
-                                asList.set(index, right);
-                            }
-                        }
-                        return left;
-                    } else {
-                        Object value;
-                        if (isArray) {
-                            value = Array.get(left, index);
-                        } else /* (isList) */ {
-                            value = ((List<?>) left).get(index);
-                        }
-                        return wrappedEvalMultiple(context, value, results, 2);
+                    Object value;
+                    if (isArray) {
+                        value = Array.get(left, index);
+                    } else /* (isList) */ {
+                        value = ((List<?>) left).get(index);
                     }
+                    return wrappedEvalMultiple(context, value, results, 2, eri);
                 } else {
                     throw new RunIssue("Support for maps not yet implemented.");
                 }
@@ -783,7 +853,7 @@ public class Runner {
                     Object val = var.get();
                     if (val instanceof Number) {
                         var.set(((Number) val).doubleValue() + 1);
-                        return wrappedEvalMultiple(context, val, results, 2);
+                        return wrappedEvalMultiple(context, val, results, 2, eri);
                     }
                 }
                 if (alteration.typeOf("decrement")) {
@@ -791,7 +861,7 @@ public class Runner {
                     Object val = var.get();
                     if (val instanceof Number) {
                         var.set(((Number) val).doubleValue() - 1);
-                        return wrappedEvalMultiple(context, val, results, 2);
+                        return wrappedEvalMultiple(context, val, results, 2, eri);
                     }
                 }
                 if (alteration.typeOf("square")) {
@@ -800,11 +870,11 @@ public class Runner {
                     if (val instanceof Number) {
                         double doubleVal = ((Number) val).doubleValue();
                         var.set(doubleVal * doubleVal);
-                        return wrappedEvalMultiple(context, val, results, 2);
+                        return wrappedEvalMultiple(context, val, results, 2, eri);
                     } else if (val instanceof String) {
                         String newVal = ((String) val).repeat(2);
                         var.set(newVal);
-                        return wrappedEvalMultiple(context, val, results, 2);
+                        return wrappedEvalMultiple(context, val, results, 2, eri);
                     }
                 }
             }
@@ -815,7 +885,7 @@ public class Runner {
                     if (val instanceof Number) {
                         double newVal = ((Number) val).doubleValue() + 1;
                         var.set(newVal);
-                        return wrappedEvalMultiple(context, newVal, results, 2);
+                        return wrappedEvalMultiple(context, newVal, results, 2, eri);
                     }
                 }
             }
@@ -826,7 +896,7 @@ public class Runner {
                     if (val instanceof Number) {
                         double newVal = ((Number) val).doubleValue() - 1;
                         var.set(newVal);
-                        return wrappedEvalMultiple(context, newVal, results, 2);
+                        return wrappedEvalMultiple(context, newVal, results, 2, eri);
                     }
                 }
             }
@@ -838,11 +908,11 @@ public class Runner {
                         double newVal = ((Number) val).doubleValue();
                         newVal = newVal * newVal;
                         var.set(newVal);
-                        return wrappedEvalMultiple(context, newVal, results, 2);
+                        return wrappedEvalMultiple(context, newVal, results, 2, eri);
                     } else if (val instanceof String) {
                         String newVal = ((String) val).repeat(2);
                         var.set(newVal);
-                        return wrappedEvalMultiple(context, newVal, results, 2);
+                        return wrappedEvalMultiple(context, newVal, results, 2, eri);
                     }
                 }
             }
@@ -852,7 +922,7 @@ public class Runner {
                     Optional<Function> function = context.getFunction(name);
                     if (function.isEmpty()) {
                         if (!context.isJavaMethodsEmpty()) {
-                            List<Object> params = computeMethodParameters(results.get(1).getChildren(), name, context);
+                            List<Object> params = computeMethodParameters(results.get(1).getChildren(), name, context, eri);
                             Optional<RunnableMethod> result = ReflectionUtils.findExecutableInternal(
                                     context.getStaticMethods().stream().filter(runnableMethod -> runnableMethod.getName().equals(name)),
                                     params.toArray()
@@ -869,7 +939,7 @@ public class Runner {
                         }
                         throw new RunIssue("No function with name: \"" + results.get(0).getText() + "\" exists.");
                     }
-                    return function.get().run(context, computeMethodParameters(results.get(1).getChildren(), results.get(0).getText(), context, function.get().getParams().size()).toArray());
+                    return function.get().run(context, eri, computeMethodParameters(results.get(1).getChildren(), results.get(0).getText(), context, function.get().getParams().size(), eri).toArray());
                 } else {
                     throw new RunIssue("No arguments for method call to method named: " + results.get(0).getText());
                 }
@@ -879,23 +949,23 @@ public class Runner {
                 if (subList.isEmpty()) {
                     return new ReturnedObject(null);
                 } else {
-                    return new ReturnedObject(evalMultiple(context, subList));
+                    return new ReturnedObject(evalMultiple(context, subList, eri));
                 }
             }
             if (resultZero.typeOf("minus")) {
-                Object right = evalMultiple(context, results.subList(1));
+                Object right = evalMultiple(context, results.subList(1), eri);
                 if (right instanceof Number) {
                     return -(((Number) right).doubleValue());
                 }
             }
             if (resultZero.typeOf("plus")) {
-                Object right = evalMultiple(context, results.subList(1));
+                Object right = evalMultiple(context, results.subList(1), eri);
                 if (right instanceof Number) {
                     return Math.abs(((Number) right).doubleValue());
                 }
             }
             if (resultZero.typeOf("negate")) {
-                Object right = evalMultiple(context, results.subList(1));
+                Object right = evalMultiple(context, results.subList(1), eri);
                 if (right instanceof Boolean) {
                     return !(Boolean) right;
                 }
@@ -905,15 +975,15 @@ public class Runner {
         throw new RunIssue("Couldn't run: " + results);
     }
 
-    private List<Object> computeMethodParameters(ParseResults params, String methodName, RunContext context) {
-        return computeMethodParameters(params, methodName, context, -1);
+    private List<Object> computeMethodParameters(ParseResults params, String methodName, RunContext context, ERI eri) {
+        return computeMethodParameters(params, methodName, context, -1, eri);
     }
-    private List<Object> computeMethodParameters(ParseResults params, String methodName, RunContext context, int expected) {
+    private List<Object> computeMethodParameters(ParseResults params, String methodName, RunContext context, int expected, ERI eri) {
         List<ParseResults> arguments = separateByType(params, get("separator"));
         if (expected > 0 && arguments.size() != expected) {
             throw new RunIssue("Invalid number of parameters in call to function named: " + methodName + ". Found " + arguments.size() + " expected " + expected);
         }
-        return arguments.stream().map(results -> evalMultiple(context, results)).collect(Collectors.toList());
+        return arguments.stream().map(results -> evalMultiple(context, results, eri)).collect(Collectors.toList());
     }
     private List<ParseResults> separateByType(ParseResults results, ParseType type) {
         List<ParseResults> arguments = new ArrayList<>();
@@ -946,14 +1016,14 @@ public class Runner {
         }
     }
 
-    private Object wrappedEvalMultiple(RunContext context, Object val, ParseResults results, int from) {
+    private Object wrappedEvalMultiple(RunContext context, Object val, ParseResults results, int from, ERI eri) {
         if (from >= results.size()) {
             return val;
         } else {
             ParseResultWrapper wrapper = new ParseResultWrapper("N/A", val);
             ParseResults subList = results.subList(from);
             subList.add(0, wrapper);
-            return evalMultiple(context, subList);
+            return evalMultiple(context, subList, eri);
         }
     }
 
@@ -984,6 +1054,15 @@ public class Runner {
 
         public Object getValue() {
             return value;
+        }
+
+        @Override
+        public String toPrettyString(int indentation) {
+            if (getChildren().isEmpty()) {
+                return "\t".repeat(indentation) + getType() + " (" + value + ")";
+            } else {
+                return super.toPrettyString(indentation);
+            }
         }
 
     }

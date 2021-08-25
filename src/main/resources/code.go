@@ -1,5 +1,9 @@
+array = [];
 
-System.in = null;
+array[0] = 10;
+array[0] += 10;
+
+println(array);
 
 // reverse(text) {
 //     array = text.split("");

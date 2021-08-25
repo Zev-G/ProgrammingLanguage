@@ -13,7 +13,7 @@ public abstract class Function {
         this.params.addAll(params);
     }
 
-    public abstract Object run(RunContext context, Object... params);
+    public abstract Object run(RunContext context, ERI eri, Object... params);
 
     public List<String> getParams() {
         return params;

@@ -19,7 +19,7 @@ public class Main {
 
     public static void main(String[] args) throws IOException {
         String code = new BufferedReader(new InputStreamReader(Objects.requireNonNull(Main.class.getClassLoader().getResourceAsStream("code.go")))).lines().collect(Collectors.joining("\n"));
-        SimpleLang.printParsed(code);
+//        SimpleLang.printParsed(code);
 //        SimpleLang.run(code);
 
         StaticContext staticContext = new StaticContext();

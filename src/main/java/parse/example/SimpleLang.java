@@ -15,6 +15,8 @@ import java.util.stream.Stream;
 
 public class SimpleLang {
 
+    public static String x = "";
+
     public static Object run(String text) {
         Optional<ParseResult> result =  new MultiLineParser().parse(text, new ParsePosition(text, 0));
         if (result.isPresent()) {

@@ -45,7 +45,7 @@ public class ParseResult {
     public String toPrettyString() {
         return toPrettyString(0);
     }
-    private String toPrettyString(int indentation) {
+    protected String toPrettyString(int indentation) {
         String indent = "\t".repeat(indentation);
         boolean hasChildren = !children.isEmpty();
         StringBuilder print = new StringBuilder(indent + type.toString());
@@ -56,7 +56,7 @@ public class ParseResult {
             }
             print.append("\n").append(indent).append("}");
         } else {
-            print.append(" [").append(text).append("]");
+            print.append(" \"").append(text).append("\"");
         }
         return print.toString();
     }

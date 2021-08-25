@@ -69,4 +69,16 @@ public class ParseResults extends ArrayList<ParseResult> {
         return get(size() - 1);
     }
 
+    public void print() {
+        System.out.println(toPrettyString());
+    }
+
+    public String toPrettyString() {
+        StringBuilder text = new StringBuilder("ParseResults {\n");
+        for (ParseResult result : this) {
+            text.append(result.toPrettyString().indent(4));
+        }
+        return text.append("}").toString();
+    }
+
 }

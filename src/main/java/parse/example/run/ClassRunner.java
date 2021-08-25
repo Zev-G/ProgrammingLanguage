@@ -50,10 +50,10 @@ public class ClassRunner {
 
         if (constructor != null) {
             Function runnableConstructor = runner.createFunction(constructor.getCode(), instanceContext);
-            runnableConstructor.run(instanceContext, params);
+            runnableConstructor.run(instanceContext, ERI.DEFAULT, params);
         }
 
-        runner.run(instanceContext, parsedClass);
+        runner.run(instanceContext, parsedClass, ERI.DEFAULT);
 
         return internalThis;
     }
@@ -77,7 +77,7 @@ public class ClassRunner {
         }
 
         ParseResult runCopy = new ParseResult(code.getType(), code.getText(), codeChildrenCopy);
-        runner.run(context, runCopy);
+        runner.run(context, runCopy, ERI.DEFAULT);
         Variable created = context.getVariable(field.getName());
         if (created == null) throw new IllegalStateException();
         context.getVariables().put(field.getName(), new Variable() {
