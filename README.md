@@ -1,3 +1,4 @@
+
 # Syntax
 
 This language's syntax isn't exactly the same as any other languge but should be pretty intuitive for seasoned programmers.
@@ -164,6 +165,41 @@ Output:
 2
 3
 4
+```
+
+### For each loops
+
+For each loops iterate over an iterable object's values, each time updating a variable's value. A second variable can be specified to track the number of times the loop has ran. An iterable object is either: a java [Iterable](https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/lang/Iterable.html) object, or an array. The variable(s) should be separated from the iterable object by either the text ":" or "in".  
+
+Example:
+```java
+array = [];  
+array[0] = "Banana";  
+array[1] = "Apple";  
+array[2] = "Chicken";
+
+for (item : array) {
+	println(item);
+}
+```
+Output:
+```
+Banana
+Apple
+Chicken
+```
+
+The easiest and fastest way to iterate over numbers is to use the `range(start, end)` function.  
+
+Example:
+```java
+for (i : range(0, 10)) {
+	print(i);
+}
+```
+Output:
+```
+0123456789
 ```
 
 ### While loops
