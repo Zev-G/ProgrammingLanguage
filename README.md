@@ -1,4 +1,20 @@
 
+# The Language
+
+This programming language (which I still haven't came up with a name for) is meant to serve as a way to quickly write simple java programs. You would be foolish to use this language for a large scale project, but for smaller projects like converting some data this language should meet your needs.  
+
+## (Possible) Drawbacks
+
+Although Object Oriented Programming features are on the way the language is not designed with them as a driving idea.  
+
+This language is not very optimized and is interpreted and executed within java, making it quite slow.  
+
+There are no types in the language.  
+
+The language has not been thoroughly tested and many features have barely been tested at all. For this reason I would not consider the language to be particularly safe, especially if you're relying on it.  
+
+Although I do—and plan to continue—using the language it was not designed for use, this entire project is primarily a learning experience. Because this project is meant for learning the code base is not well designed or documented.
+
 # Syntax
 
 This language's syntax isn't exactly the same as any other language but should be pretty intuitive for seasoned programmers.
