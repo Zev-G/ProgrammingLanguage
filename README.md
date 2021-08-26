@@ -1,11 +1,11 @@
 
 # Syntax
 
-This language's syntax isn't exactly the same as any other languge but should be pretty intuitive for seasoned programmers.
+This language's syntax isn't exactly the same as any other language but should be pretty intuitive for seasoned programmers.
 
 ## Structure
 
-Structurally this language is quite similiar to C or Java. Semicolons separate lines and brackets are used for the body of statements and methods.
+Structurally this language is quite similar to C or Java. Semicolons separate lines and brackets are used for the body of statements and methods.
 
 Example:
 ```java
@@ -18,12 +18,15 @@ if (x < 50) {
 
 ## Comments
 
-Currently there is only support for single-line commnents. Single-line comments are declared with two forward slashes "//".
-> There are plans in the future to add support for multi-line comments.
+There are two types of comments with support in the language, single-line comments, and multi-line comments. Single-line comments are declared with two forward slashes "//" and all text after the slashes on that line is ignored. Multi-line comments start with "/*" and end with "\*/", all text between the start and end is ignored. 
 
 Example:
 ```java
 // This is a comment.
+
+/*
+This is also a comment
+*/
 ```
 
 ## Variables
