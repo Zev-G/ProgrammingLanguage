@@ -3,7 +3,7 @@ private array = [];
 array[0] = 10;
 array[0] += 10;
 
-private x() {
+static x() {
     return "hi";
 }
 

@@ -18,13 +18,17 @@ import java.util.stream.Collectors;
 public class Main {
 
     public static void main(String[] args) throws IOException {
-        String code = new BufferedReader(new InputStreamReader(Objects.requireNonNull(Main.class.getClassLoader().getResourceAsStream("code.go")))).lines().collect(Collectors.joining("\n"));
-//        SimpleLang.printParsed(code);
+        try {
+            String code = new BufferedReader(new InputStreamReader(Objects.requireNonNull(Main.class.getClassLoader().getResourceAsStream("code.go")))).lines().collect(Collectors.joining("\n"));
+        SimpleLang.printParsed(code);
 //        SimpleLang.run(code);
 
-        StaticContext staticContext = new StaticContext();
-        ClassRunner classRunner = new ClassRunner(staticContext, SimpleLang.parse(code), ClassHeader.basic("Main", AccessModifier.PUBLIC));
-        InternalObject result = classRunner.newInstance(null);
+            StaticContext staticContext = new StaticContext();
+            ClassRunner classRunner = new ClassRunner(staticContext, SimpleLang.parse(code), ClassHeader.basic("Main", AccessModifier.PUBLIC));
+            InternalObject result = classRunner.newInstance(null);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
 }

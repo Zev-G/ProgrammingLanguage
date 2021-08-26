@@ -116,6 +116,7 @@ public class ClassParser {
             }
         }
 
+        if (accessModifier == null && static_) accessModifier = AccessModifier.PACKAGE;
         if (!foundVariable || accessModifier == null) return Optional.empty();
         return Optional.of(new FieldCheckResult(static_, final_, variable, value, line, accessModifier));
     }
@@ -178,7 +179,9 @@ public class ClassParser {
             }
         }
 
-        if (name != null && accessModifier == null && (name.equals("constructor") || name.equals(this.header.getName()))) accessModifier = AccessModifier.PACKAGE;
+        boolean isConstructor = name != null && (name.equals("constructor") || name.equals(this.header.getName()));
+
+        if (accessModifier == null && (isConstructor || static_)) accessModifier = AccessModifier.PACKAGE;
         if (name == null || accessModifier == null) return Optional.empty();
         if (name.equals("constructor") || name.equals(this.header.getName())) {
             constructor = true;

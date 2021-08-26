@@ -5,7 +5,6 @@ import parse.ParseType;
 import parse.example.ClassParser;
 import parse.example.run.oo.*;
 
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -144,6 +143,10 @@ public class ClassRunner {
 
     public ClassDefinition getDefinition() {
         return definition;
+    }
+
+    public List<InternalMethod> getStaticMethods() {
+        return staticMethods;
     }
 
 }
