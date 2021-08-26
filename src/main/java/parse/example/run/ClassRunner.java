@@ -5,6 +5,7 @@ import parse.ParseType;
 import parse.example.ClassParser;
 import parse.example.run.oo.*;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -21,6 +22,8 @@ public class ClassRunner {
 
     private final ClassDefinition definition;
 
+    private final List<InternalMethod> staticMethods = new ArrayList<>();
+
     public ClassRunner(StaticContext staticContext, ParseResult parsedClass, ClassHeader header) {
         this.staticContext = staticContext;
         this.parsedClass = parsedClass;
@@ -29,6 +32,16 @@ public class ClassRunner {
         strip();
         staticContext.registerClass(this);
         runner = new Runner(staticContext);
+        RunContext global = runner.getGlobal();
+
+        // Register static methods.
+        for (MethodDefinition definition : definition.getMethods()) {
+            if (definition.isStatic()) {
+                InternalMethod staticMethod = createMethod(definition, global);
+                staticMethods.add(staticMethod);
+                global.registerFunction(staticMethod.getName(), staticMethod.getFunction());
+            }
+        }
     }
 
     public Object run() {
@@ -45,7 +58,15 @@ public class ClassRunner {
         final InternalObject internalThis = new InternalObject(this, instanceContext);
         instanceContext.getOrCreateVariable("this", internalThis);
 
+        // Create instance fields.
         createInstanceFields(instanceContext, internalThis);
+        // Register instance methods.
+        for (MethodDefinition methodDefinition : definition.getMethods()) {
+            if (!methodDefinition.isStatic()) {
+                InternalMethod method = createMethod(methodDefinition, instanceContext);
+                instanceContext.registerFunction(method.getName(), method.getFunction());
+            }
+        }
 
         if (constructor != null) {
             Function runnableConstructor = runner.createFunction(constructor.getCode(), instanceContext);
@@ -55,6 +76,10 @@ public class ClassRunner {
         runner.run(instanceContext, parsedClass, ERI.DEFAULT);
 
         return internalThis;
+    }
+
+    private InternalMethod createMethod(MethodDefinition definition, RunContext context) {
+        return new InternalMethod(this.definition, definition, runner.createFunction(definition.getCode(), context));
     }
 
     private void createInstanceFields(RunContext instanceContext, InternalObject object) {

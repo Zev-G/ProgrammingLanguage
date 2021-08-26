@@ -3,8 +3,14 @@ private array = [];
 array[0] = 10;
 array[0] += 10;
 
+private x() {
+    return "hi";
+}
+
 println(array);
 println(this.array);
+
+println(x());
 
 // reverse(text) {
 //     array = text.split("");
