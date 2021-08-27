@@ -22,13 +22,9 @@ public class Main {
 //        SimpleLang.printParsed(code);
 //        SimpleLang.run(code);
 
-            Path loc = new File(Objects.requireNonNull(Main.class.getClassLoader().getResource("Main.go")).getFile()).toPath().getParent();
-            VirtualFolder<Path> folder = VirtualFolder.fromPath(loc);
-            VirtualFile<Path> main = folder.getFile("Main.go");
-
-            StaticContext staticContext = new StaticContext(folder);
-            ClassRunner classRunner = new ClassRunner(staticContext, SimpleLang.parse(code), ClassHeader.basic("Main", AccessModifier.PUBLIC), main);
-            InternalObject result = classRunner.newInstance(null);
+            SimpleLang.run(
+                    new File(Objects.requireNonNull(Main.class.getClassLoader().getResource("Main.go")).getFile()).toPath()
+            );
         } catch (Exception e) {
             e.printStackTrace();
         }

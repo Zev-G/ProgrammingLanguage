@@ -56,6 +56,11 @@ public abstract class VirtualFile<T> extends VirtualFileBase<T> {
         }
     }
 
+    @Override
+    public String toString() {
+        return getName();
+    }
+
     public boolean isClass() {
         return class_;
     }

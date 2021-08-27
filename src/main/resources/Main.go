@@ -1,4 +1,6 @@
-Other.method();
+import java.io.*;
+
+println(new IOException());
 
 // println("How many time do you want this to run?");
 // times = Integer.parseInt(new Scanner(System.in).nextLine());

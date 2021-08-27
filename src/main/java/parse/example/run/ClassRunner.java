@@ -32,6 +32,7 @@ public class ClassRunner {
         strip();
         staticContext.registerClass(this);
         runner = new Runner(staticContext);
+        runner.initializeImports(parsedClass);
         RunContext global = runner.getGlobal();
 
         // Register static methods.

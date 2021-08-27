@@ -135,10 +135,7 @@ public class Runner {
         global.getImports().add(Import.fromString("java.util.*"));
     }
 
-    public Object run(ParseResult result) {
-        return run(result, ERI.DEFAULT);
-    }
-    public Object run(ParseResult result, ERI eri) {
+    public void initializeImports(ParseResult result) {
         // Look for imports
         for (ParseResult child : result.getChildren()) {
             if (child.typeOf(ImportParser.TYPE)) {
@@ -153,6 +150,13 @@ public class Runner {
                 }
             }
         }
+    }
+
+    public Object run(ParseResult result) {
+        return run(result, ERI.DEFAULT);
+    }
+    public Object run(ParseResult result, ERI eri) {
+        initializeImports(result);
 
         // Run
         return run(global, result, eri);

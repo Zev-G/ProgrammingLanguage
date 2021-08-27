@@ -43,7 +43,9 @@ public class StaticContext {
 
     public Optional<ClassRunner> findClass(String name) {
         if (location == null || name.isEmpty()) return Optional.empty();
-        VirtualFile<?> file = location.getFile(name + "." + SimpleLang.ENDING);
+        return findClass(location.getFile(name));
+    }
+    public Optional<ClassRunner> findClass(VirtualFile<?> file) {
         if (file == null) return Optional.empty();
         if (classes.containsKey(file)) return Optional.of(classes.get(file));
         return Optional.of(registerClass(file));

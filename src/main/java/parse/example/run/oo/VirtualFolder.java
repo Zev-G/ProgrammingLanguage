@@ -14,6 +14,11 @@ public class VirtualFolder<T> extends VirtualFileBase<T> {
     private final List<VirtualFile<T>> files = new ArrayList<>();
     private final List<VirtualFolder<T>> folders = new ArrayList<>();
 
+    @SuppressWarnings("unchecked")
+    public static <T> VirtualFolder<T> parent(VirtualFile<T> child) {
+        return new VirtualFolder<>(true, child.getParent(), "folder", (VirtualFileBase<T>[]) new VirtualFileBase<?>[]{ child }, null);
+    }
+
     public static VirtualFolder<Path> fromPath(Path path) {
         return fromPath(path, obj -> true);
     }
@@ -58,7 +63,7 @@ public class VirtualFolder<T> extends VirtualFileBase<T> {
 
     public VirtualFile<T> getFile(String s) {
         for (VirtualFile<T> file : files) {
-            if (file.getName().equals(s)) return file;
+            if (file.getPlainName().equals(s)) return file;
         }
         return null;
     }
