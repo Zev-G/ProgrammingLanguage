@@ -15,6 +15,7 @@ import parse.example.reflect.RunnableMethod;
 import parse.example.run.oo.ClassDefinition;
 import parse.example.run.oo.ConstructorDefinition;
 import parse.example.run.oo.InternalObject;
+import parse.example.run.oo.MethodSignature;
 
 import java.io.PrintStream;
 import java.lang.reflect.*;
@@ -593,6 +594,11 @@ public class Runner {
                     Optional<Class<?>> classLookupResult = context.findClass(zero.getText());
                     if (classLookupResult.isPresent()) {
                         left = StaticClass.forClass(classLookupResult.get());
+                    } else if (staticContext != null) {
+                        Optional<ClassRunner> internalClass = staticContext.findClass(zero.getText());
+                        if (internalClass.isPresent()) {
+                            left = internalClass.get();
+                        }
                     }
                 }
                 if (left == UNSET) {
@@ -650,6 +656,12 @@ public class Runner {
                     if (left instanceof InternalObject) {
                         Object[] args = arguments.toArray();
                         return ((InternalObject) left).getMethod(methodName, args).getFunction().run(context, eri, args);
+                    }
+
+                    // Check if we are looking for the static method of an internal class.
+                    if (left instanceof ClassRunner) {
+                        Object[] args = arguments.toArray();
+                        return ((ClassRunner) left).getStaticMethodsMap().get(new MethodSignature(methodName, args.length)).getFunction().run(context, eri, args);
                     }
 
                     Optional<Method> method;

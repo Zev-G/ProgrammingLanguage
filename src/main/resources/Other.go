@@ -1,6 +1,10 @@
 
 private value;
 
+static method() {
+    println("Executed statically");
+}
+
 constructor(value) {
     this.value = value;
 }

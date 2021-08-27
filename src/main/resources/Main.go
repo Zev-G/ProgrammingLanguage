@@ -1,7 +1,4 @@
-other = new Other("test");
-otherOther = new Other("another val");
-println(other.getValue());
-println(otherOther.getValue());
+Other.method();
 
 // println("How many time do you want this to run?");
 // times = Integer.parseInt(new Scanner(System.in).nextLine());

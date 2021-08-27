@@ -154,6 +154,10 @@ public class ClassRunner {
         return staticMethods;
     }
 
+    public Map<MethodSignature, InternalMethod> getStaticMethodsMap() {
+        return staticMethodsMap;
+    }
+
     public VirtualFile<?> getLoc() {
         return loc;
     }
