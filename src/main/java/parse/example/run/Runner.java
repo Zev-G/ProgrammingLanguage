@@ -12,6 +12,8 @@ import parse.example.TypeRegistry;
 import parse.example.reflect.ObjectsRunnableMethod;
 import parse.example.reflect.ReflectionUtils;
 import parse.example.reflect.RunnableMethod;
+import parse.example.run.oo.ClassDefinition;
+import parse.example.run.oo.ConstructorDefinition;
 import parse.example.run.oo.InternalObject;
 
 import java.io.PrintStream;
@@ -67,7 +69,7 @@ public class Runner {
     private ParseResult currentLine;
 
     public Runner() {
-        this(new StaticContext());
+        this(new StaticContext(null));
     }
     public Runner(StaticContext staticContext) {
         this.staticContext = staticContext;
@@ -478,7 +480,9 @@ public class Runner {
                 } else if (results.get(equalPos - 1).typeOf("variable") && results.get(equalPos - 2).typeOf("period")) {
                     Object upTo = evalMultiple(context, results.subList(0, equalPos - 2), eri.changedLookingForStaticClass(true).addAutoRemovingCheckpoint(1, eri1 -> eri1.setLookingForStaticClass(false)));
                     if (upTo instanceof InternalObject) {
-                        throw new RunIssue("Accessing internal fields is not yet supported.");
+                        InternalObject obj = (InternalObject) upTo;
+                        varName = results.get(equalPos - 1).getText();
+                        var = obj.getFields().get(varName);
                     } else {
                         if (upTo == null) throw new RunIssue("Tried to access field of null object.");
                         try {
@@ -642,6 +646,12 @@ public class Runner {
                     String methodName = member.get(0).getText();
                     List<Object> arguments = computeMethodParameters(member.get(1).getChildren(), methodName, context, eri);
 
+                    // Check if the object who's method is trying to be accessed is an internal object.
+                    if (left instanceof InternalObject) {
+                        Object[] args = arguments.toArray();
+                        return ((InternalObject) left).getMethod(methodName, args).getFunction().run(context, eri, args);
+                    }
+
                     Optional<Method> method;
                     if (left instanceof StaticClass) {
                         method = ReflectionUtils.findMethod(
@@ -704,6 +714,22 @@ public class Runner {
                             throw new RunIssue("No constructor for class \"" + referencedClass.get() + "\" with parameters that match " + Arrays.toString(arguments) + ".");
                         }
                     } else {
+                        if (staticContext != null && staticContext.getLocation() != null) {
+                            Optional<ClassRunner> internalClass = staticContext.findClass(name);
+                            if (internalClass.isPresent()) {
+                                ClassRunner classRunner = internalClass.get();
+                                ClassDefinition definition = classRunner.getDefinition();
+
+                                Object[] arguments = computeMethodParameters(results.get(2).getChildren(), "new " + name + "(...)", context, eri).toArray();
+                                ConstructorDefinition constructor = definition.getConstructor(arguments);
+
+                                try {
+                                    return classRunner.newInstance(constructor, arguments);
+                                } catch (IllegalArgumentException e) {
+                                    throw new RunIssue("No constructor for class \"" + definition.getName() + "\" with parameters that match " + Arrays.toString(arguments) + ".");
+                                }
+                            }
+                        }
                         throw new RunIssue("Couldn't find class named: " + name);
                     }
                 } else {

@@ -5,9 +5,7 @@ import parse.ParseType;
 import parse.example.ClassParser;
 import parse.example.run.oo.*;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
 import static parse.example.TypeRegistry.get;
 
@@ -18,14 +16,17 @@ public class ClassRunner {
     private final StaticContext staticContext;
     private final ParseResult parsedClass;
     private final Runner runner;
+    private final VirtualFile<?> loc;
 
     private final ClassDefinition definition;
 
     private final List<InternalMethod> staticMethods = new ArrayList<>();
+    private final Map<MethodSignature, InternalMethod> staticMethodsMap = new HashMap<>();
 
-    public ClassRunner(StaticContext staticContext, ParseResult parsedClass, ClassHeader header) {
+    public ClassRunner(StaticContext staticContext, ParseResult parsedClass, ClassHeader header, VirtualFile<?> loc) {
         this.staticContext = staticContext;
         this.parsedClass = parsedClass;
+        this.loc = loc;
 
         definition = ClassParser.parse(parsedClass, header);
         strip();
@@ -38,6 +39,7 @@ public class ClassRunner {
             if (definition.isStatic()) {
                 InternalMethod staticMethod = createMethod(definition, global);
                 staticMethods.add(staticMethod);
+                staticMethodsMap.put(staticMethod.getSignature(), staticMethod);
                 global.registerFunction(staticMethod.getName(), staticMethod.getFunction());
             }
         }
@@ -64,8 +66,11 @@ public class ClassRunner {
             if (!methodDefinition.isStatic()) {
                 InternalMethod method = createMethod(methodDefinition, instanceContext);
                 instanceContext.registerFunction(method.getName(), method.getFunction());
+                internalThis.getMethods().put(method.getSignature(), method);
             }
         }
+        // Register static methods.
+        internalThis.getMethods().putAll(staticMethodsMap);
 
         if (constructor != null) {
             Function runnableConstructor = runner.createFunction(constructor.getCode(), instanceContext);
@@ -147,6 +152,10 @@ public class ClassRunner {
 
     public List<InternalMethod> getStaticMethods() {
         return staticMethods;
+    }
+
+    public VirtualFile<?> getLoc() {
+        return loc;
     }
 
 }

@@ -15,6 +15,7 @@ import java.util.stream.Stream;
 
 public class SimpleLang {
 
+    public static final String ENDING = "go";
     public static String x = "";
 
     public static Object run(String text) {

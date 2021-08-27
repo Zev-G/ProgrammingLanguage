@@ -10,6 +10,7 @@ public class InternalMethod {
     private final Function function;
     private final ClassDefinition classDefinition;
     private final MethodDefinition definition;
+    private final MethodSignature signature;
 
     public InternalMethod(ClassDefinition classDefinition, MethodDefinition definition, Function function) {
         this.name = definition.getName();
@@ -18,6 +19,7 @@ public class InternalMethod {
         this.function = function;
         this.classDefinition = classDefinition;
         this.definition = definition;
+        this.signature = new MethodSignature(name, function.getParams().size());
     }
 
     public String getName() {
@@ -38,6 +40,10 @@ public class InternalMethod {
 
     public boolean isStatic() {
         return static_;
+    }
+
+    public MethodSignature getSignature() {
+        return signature;
     }
 
 }

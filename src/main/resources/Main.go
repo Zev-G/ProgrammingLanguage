@@ -1,16 +1,46 @@
-private array = [];
+other = new Other("test");
+otherOther = new Other("another val");
+println(other.getValue());
+println(otherOther.getValue());
 
-array[0] = 10;
-array[0] += 10;
+// println("How many time do you want this to run?");
+// times = Integer.parseInt(new Scanner(System.in).nextLine());
+//
+// map = new HashMap();
+//
+// println(compute(times));
 
-static x() {
-    return "hi";
-}
+// for (i : range(0, times+1)) {
+//     map.put(i, compute(i));
+// }
+//
+// for (entry : map.entrySet()) {
+//     println(entry.getKey() + " = " + entry.getValue());
+// }
 
-println(array);
-println(this.array);
-
-println(x());
+// compute(numTimes) {
+//     nums = [1];
+//     total = 1;
+//     for (i : range(0, numTimes)) {
+//         nums.add(total);
+//         stringTotal = String.valueOf(Math.floor(total));
+//         preTotal = total;
+//
+//         broke = false;
+//         for (char : stringTotal.split("")) {
+//             if (!broke) {
+//                 if (char.equals(".")) { broke = true; };
+//                 else { total += Integer.parseInt(char); }
+//             }
+//         }
+//     }
+//
+//     text = "";
+//     for (num : nums) {
+//         text = text + String.valueOf(num.intValue());
+//     }
+//     return text;
+// }
 
 // reverse(text) {
 //     array = text.split("");

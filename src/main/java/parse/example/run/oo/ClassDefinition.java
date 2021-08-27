@@ -57,4 +57,11 @@ public class ClassDefinition extends ClassDefinitionBase {
                 '}';
     }
 
+    public ConstructorDefinition getConstructor(Object[] arguments) {
+        for (ConstructorDefinition constructor : constructors) {
+            if (constructor.getParameters().length == arguments.length) return constructor;
+        }
+        return null;
+    }
+
 }
