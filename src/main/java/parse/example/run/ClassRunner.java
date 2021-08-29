@@ -16,6 +16,7 @@ public class ClassRunner {
     private final StaticContext staticContext;
     private final ParseResult parsedClass;
     private final Runner runner;
+    private final ClassHeader header;
     private final VirtualFile<?> loc;
 
     private final ClassDefinition definition;
@@ -26,6 +27,7 @@ public class ClassRunner {
     public ClassRunner(StaticContext staticContext, ParseResult parsedClass, ClassHeader header, VirtualFile<?> loc) {
         this.staticContext = staticContext;
         this.parsedClass = parsedClass;
+        this.header = header;
         this.loc = loc;
 
         definition = ClassParser.parse(parsedClass, header);
@@ -52,9 +54,9 @@ public class ClassRunner {
 
     public InternalObject newInstance(ConstructorDefinition constructor, Object... params) {
         if (constructor != null) {
-            if (constructor.getClassDefinition() != null && constructor.getClassDefinition() != definition) throw new IllegalArgumentException();
-            if (!definition.containsConstructor(constructor)) throw new IllegalArgumentException();
-        } else if (definition.getConstructors().length != 0) throw new IllegalArgumentException();
+            if (constructor.getClassDefinition() != null && constructor.getClassDefinition() != definition) throw new IllegalArgumentException(this.header.toString());
+            if (!definition.containsConstructor(constructor)) throw new IllegalArgumentException(this.header.toString());
+        } else if (definition.getConstructors().length != 0) throw new IllegalArgumentException(this.header.toString());
 
         RunContext instanceContext = new RunContext(runner.getGlobal());
         final InternalObject internalThis = new InternalObject(this, instanceContext);
@@ -70,6 +72,8 @@ public class ClassRunner {
                 internalThis.getMethods().put(method.getSignature(), method);
             }
         }
+        // Initialize functions
+        runner.initializeFunctions(instanceContext, parsedClass);
         // Register static methods.
         internalThis.getMethods().putAll(staticMethodsMap);
 
@@ -78,7 +82,7 @@ public class ClassRunner {
             runnableConstructor.run(instanceContext, ERI.DEFAULT, params);
         }
 
-        runner.run(instanceContext, parsedClass, ERI.DEFAULT);
+        runner.run(instanceContext, parsedClass, ERI.DEFAULT.addAutoRemovingCheckpoint(2, eri -> eri.setInitializeFunctions(true)));
 
         return internalThis;
     }

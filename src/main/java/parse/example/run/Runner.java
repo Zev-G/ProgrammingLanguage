@@ -208,16 +208,7 @@ public class Runner {
         // Run
         return run(global, result, eri);
     }
-    public Object run(RunContext context, ParseResult result, ERI eri) {
-        // Check for illegal types.
-        if (result.getType().equals(TypeRegistry.get("method-declaration"))) {
-            throw new RunIssue("Can't register function from this point.");
-        }
-        // Check for ignored types.
-        if (result.typeOf(ImportParser.TYPE)) {
-            return null;
-        }
-        // Check for method-declarations.
+    public void initializeFunctions(RunContext context, ParseResult result) {
         for (ParseResult child : result.getChildren()) {
             if (child.typeOf(TypeRegistry.get("statement"))) {
                 ParseResult header = child.getChildren().get(0);
@@ -228,6 +219,21 @@ public class Runner {
                 }
             }
         }
+    }
+    public Object run(RunContext context, ParseResult result, ERI eri) {
+        // Check for illegal types.
+        if (result.getType().equals(TypeRegistry.get("method-declaration"))) {
+            throw new RunIssue("Can't register function from this point.");
+        }
+        // Check for ignored types.
+        if (result.typeOf(ImportParser.TYPE)) {
+            return null;
+        }
+        // Check for method-declarations.
+        if (eri.initializeFunctions()) {
+            initializeFunctions(context, result);
+        }
+        eri.reachedCheckpoint(2);
         // Get type for further use.
         ParseType type = result.getType();
         // Run a statement.
@@ -276,14 +282,14 @@ public class Runner {
         return createFunction(statement.getChildren().get(0).getChildren().get(0), statement.getChildren().get(1), context);
     }
     public Function createFunction(ParseResult declaration, ParseResult body, RunContext context) {
-        String methodName = declaration.getChildren().get(0).getText();
-        List<String> params = declaration.getChildren().get(1).getChildren().stream().map(ParseResult::getText).collect(Collectors.toList());
+        String methodName = declaration.getChildren().get(declaration.getChildren().firstTypeOf("method-name")).getText();
+        List<String> params = declaration.getChildren().get(declaration.getChildren().firstTypeOf("parameters")).getChildren().stream().map(ParseResult::getText).collect(Collectors.toList());
         return new Function(params) {
             @Override
             public Object run(RunContext context1, ERI eri, Object... vars) {
                 if (vars == null) vars = new Object[0];
                 if (params.size() != vars.length) {
-                    throw new RunIssue("Invalid number of parameters in method call to method: " + methodName);
+                    throw new RunIssue("Invalid number of parameters in method call to method: \"" + methodName + "\". Expected " + params.size() + " parameters but found " + vars.length + " parameters.");
                 }
                 RunContext functionContext = new RunContext(context);
                 for (int i = 0, paramsSize = params.size(); i < paramsSize; i++) {

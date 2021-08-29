@@ -21,6 +21,14 @@ public class MethodSignature {
     }
 
     @Override
+    public String toString() {
+        return "MethodSignature{" +
+                "name='" + name + '\'' +
+                ", args=" + args +
+                '}';
+    }
+
+    @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;

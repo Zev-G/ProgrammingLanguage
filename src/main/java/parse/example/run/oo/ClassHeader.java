@@ -46,4 +46,15 @@ public class ClassHeader {
         return abstract_;
     }
 
+    @Override
+    public String toString() {
+        StringBuilder builder = new StringBuilder();
+        if (accessModifier != AccessModifier.PACKAGE) builder.append(accessModifier.toString().toLowerCase()).append(" ");
+        if (isAbstract()) builder.append("abstract ");
+        if (isFinal()) builder.append("final ");
+        builder.append(name).append(" ");
+        if (superClass != null && superClass != ClassDefinition.OBJECT) builder.append("extends ").append(superClass.getName());
+        return builder.toString();
+    }
+
 }

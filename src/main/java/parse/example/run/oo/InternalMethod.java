@@ -19,7 +19,7 @@ public class InternalMethod {
         this.function = function;
         this.classDefinition = classDefinition;
         this.definition = definition;
-        this.signature = new MethodSignature(name, function.getParams().size());
+        this.signature = new MethodSignature(name, definition.getParameters().length);
     }
 
     public String getName() {
