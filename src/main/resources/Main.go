@@ -1,6 +1,16 @@
-import java.io.*;
+import java.util.function.*;
 
-println(new IOException());
+x = lambda("run", Predicate.class);
+
+println(x);
+
+for (i : range(0, 10)) {
+    println(x.negate().test("hey"));
+}
+
+run(x) {
+    return Math.random() > 0.5;
+}
 
 // println("How many time do you want this to run?");
 // times = Integer.parseInt(new Scanner(System.in).nextLine());

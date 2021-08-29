@@ -18,6 +18,7 @@ import parse.example.run.oo.InternalObject;
 import parse.example.run.oo.MethodSignature;
 
 import java.io.PrintStream;
+import java.lang.invoke.MethodHandles;
 import java.lang.reflect.*;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -74,6 +75,52 @@ public class Runner {
     }
     public Runner(StaticContext staticContext) {
         this.staticContext = staticContext;
+        global.registerFunction("lambda", new Function(List.of("methodName", "toClass")) {
+                    @Override
+                    public Object run(RunContext context, ERI eri, Object... params) {
+                        Optional<Function> result = context.getFunction(String.valueOf(params[0]));
+                        if (result.isPresent() && params[1] instanceof Class<?>) {
+                            Class<?> toClass = (Class<?>) params[1];
+                            if (toClass.isInterface()) {
+                                // Check if interface is a functional interface.
+                                Method[] methods = toClass.getMethods();
+                                Method abstractMethod = null;
+                                boolean foundAbstract = false;
+                                for (Method method : methods) {
+                                    if (Modifier.isAbstract(method.getModifiers())) {
+                                        if (foundAbstract) {
+                                            foundAbstract = false;
+                                            break;
+                                        }
+                                        abstractMethod = method;
+                                        foundAbstract = true;
+                                    }
+                                }
+                                if (foundAbstract) {
+                                    final Method finalAbstractMethod = abstractMethod;
+                                    MethodHandles.Lookup lookup = MethodHandles.lookup();
+                                    Object obj = new Object();
+                                    return Proxy.newProxyInstance(
+                                            toClass.getClassLoader(), new Class<?>[]{ toClass }, (proxy, method, args) -> {
+                                                if (finalAbstractMethod.equals(method)) {
+                                                    return result.get().run(context, eri, args);
+                                                } else if (method.isDefault()) {
+                                                    return lookup
+                                                            .unreflectSpecial(method, method.getDeclaringClass())
+                                                            .bindTo(proxy)
+                                                            .invokeWithArguments(args);
+                                                } else {
+                                                    return method.invoke(obj, args);
+                                                }
+                                            }
+                                    );
+                                }
+                            }
+                        }
+                        return null;
+                    }
+                }
+        );
         global.registerFunction("print", new Function(Collections.singleton("text")) {
             @Override
             public Object run(RunContext context, ERI eri, Object... params) {
@@ -234,6 +281,7 @@ public class Runner {
         return new Function(params) {
             @Override
             public Object run(RunContext context1, ERI eri, Object... vars) {
+                if (vars == null) vars = new Object[0];
                 if (params.size() != vars.length) {
                     throw new RunIssue("Invalid number of parameters in method call to method: " + methodName);
                 }
