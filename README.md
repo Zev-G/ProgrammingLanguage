@@ -362,6 +362,44 @@ Output:
 4
 ```
 
+## Defining classes 
+
+All files in the language are a class, as of now there is no way to specify the accessibility of a class.  
+
+## Defining fields and methods
+
+To define a field write a variable with either an accessibility modifier or static modifier in front of it. The modifier must be written at the root context.
+
+Example:
+```java
+x = 0; // Not a field.
+if (true) {
+	private err = "won't work"; // This code won't work.
+}
+// Valid fields:
+static y = 100;
+private z = "test";
+public static oragne = "#f59e42";
+```
+
+Defining methods is the same except instead of variable you're writing functions.  
+
+Example:
+```java
+// Valid:
+static test() { return "test"; }
+// Valid:
+package test() { return "test"; }
+// Valid:
+public static test() { return "test"; }
+// Invalid:
+test() { return "test"; }
+// Invalid:
+if (true) {
+	private test() { return "test"; }
+}
+```
+
 # Examples
 
 Example chess application:
