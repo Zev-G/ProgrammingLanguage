@@ -1,7 +1,7 @@
 
 # The Language
 
-This programming language (which I still haven't came up with a name for) is meant to serve as a way to quickly write simple java programs. You would be foolish to use this language for a large scale project, but for smaller projects like converting some data this language should meet your needs.  
+This programming language (which I still haven't came up with a name for) is meant to serve as a way to quickly write simple java programs.
 
 ## (Possible) Drawbacks
 
