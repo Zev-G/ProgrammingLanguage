@@ -3,7 +3,7 @@
 
 This programming language (which I still haven't came up with a name for) is meant to serve as a way to quickly write simple java programs.
 
-## (Possible) Drawbacks
+## Drawbacks
 
 Although Object Oriented Programming features are on the way the language is not designed with them as a driving idea.  
 
